@@ -4,8 +4,8 @@
 set -e
 cd "$(dirname "$0")"
 PY=$(command -v python3 || command -v python || true)
-[ -n "$PY" ] || { echo "Falta Python 3.10 o mas nuevo: https://www.python.org/downloads/"; exit 1; }
-"$PY" -c 'import sys; sys.exit(sys.version_info < (3, 10))' || { echo "Necesitas Python 3.10 o mas nuevo."; exit 1; }
+[ -n "$PY" ] || { echo "Falta Python 3.11 o mas nuevo: https://www.python.org/downloads/"; exit 1; }
+"$PY" -c 'import sys; sys.exit(sys.version_info < (3, 11))' || { echo "Necesitas Python 3.11 o mas nuevo."; exit 1; }
 if [ ! -d .venv ]; then
   echo "Preparando el entorno (solo la primera vez)..."
   "$PY" -m venv .venv

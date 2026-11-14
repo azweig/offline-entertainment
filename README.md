@@ -10,7 +10,7 @@
 <p align="center">
   <a href="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml"><img src="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-f2a33a" alt="MIT"></a>
-  <img src="https://img.shields.io/badge/python-3.10%2B-1b2636" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/python-3.11%2B-1b2636" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/self--hosted-yes-1b2636" alt="Self-hosted">
 </p>
 
@@ -91,7 +91,7 @@ the link of one video or one song.
 
 ### On your computer (macOS, Linux, Windows)
 
-Requirements: Python 3.10+, [ffmpeg](https://ffmpeg.org/) and [Deno](https://deno.com/). yt-dlp uses
+Requirements: Python 3.11+, [ffmpeg](https://ffmpeg.org/) and [Deno](https://deno.com/). yt-dlp uses
 Deno to read YouTube.
 
 1. `git clone https://github.com/azweig/offline-entertainment && cd offline-entertainment`

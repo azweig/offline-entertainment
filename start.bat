@@ -2,8 +2,8 @@
 rem Arranque para Windows: doble clic, o "start.bat --host 0.0.0.0" para tu red de casa
 cd /d "%~dp0"
 where py >nul 2>nul && (set PY=py -3) || (set PY=python)
-%PY% -c "import sys; sys.exit(sys.version_info < (3, 10))" 2>nul || (
-  echo Necesitas Python 3.10 o mas nuevo: https://www.python.org/downloads/
+%PY% -c "import sys; sys.exit(sys.version_info < (3, 11))" 2>nul || (
+  echo Necesitas Python 3.11 o mas nuevo: https://www.python.org/downloads/
   pause & exit /b 1
 )
 if not exist .venv (
