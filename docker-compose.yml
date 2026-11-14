@@ -1,0 +1,15 @@
+services:
+  offline-entertainment:
+    build: .
+    restart: unless-stopped
+    ports:
+      # Solo este equipo. Para usarlo desde el celular en tu red de casa cambia a "8765:8765"
+      # (lee "Desde el celular" en el README).
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./config:/config        # aqui queda tu clave (archivo config/key)
+    # Opcional: tu propia clave en vez de la generada
+    # environment:
+    #   OFFLINE_KEY: "una-clave-larga-y-privada"
+    logging:
+      driver: "none"            # sin registros

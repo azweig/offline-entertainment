@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offline Entertainment</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1017">
+<style>
+  :root{--bg:#0b1017;--panel:#141d28;--line:#223041;--text:#eef2f6;--muted:#8799ab;
+        --accent:#f2a33a;--ink:#1b1206;--err:#ef6b6b;--ok:#4cc38a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  .top{position:sticky;top:0;z-index:5;background:linear-gradient(#0b1017 70%,#0b101700);padding:12px 16px 14px}
+  .bar{display:flex;gap:12px;align-items:center;max-width:1200px;margin:0 auto}
+  .logo{display:flex;align-items:center;gap:8px;white-space:nowrap;line-height:1}
+  .logo img{width:30px;height:30px;flex:none}
+  .logo b{display:block;font-weight:800;font-size:17px;letter-spacing:-.02em}
+  .logo small{display:block;margin-top:2px;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  .keybox .logo{justify-content:center;margin-bottom:4px}
+  .keybox .ch{white-space:normal;text-align:center}
+  .keybox .logo img{width:44px;height:44px}
+  .keybox .logo b{font-size:22px}
+  .keybox .logo small{font-size:11px}
+  .search{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:10px 16px}
+  .search:focus{outline:2px solid var(--accent)}
+  .net{font-size:11px;padding:3px 8px;border-radius:99px;border:1px solid var(--line);white-space:nowrap;color:var(--muted)}
+  .net.off{color:var(--accent);border-color:var(--accent)}
+  nav{display:flex;gap:6px;overflow-x:auto;max-width:1200px;margin:10px auto 0;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{background:transparent;border:1px solid transparent;border-radius:99px;padding:6px 13px;color:var(--muted);white-space:nowrap}
+  nav button.on{background:var(--text);color:var(--bg);font-weight:650}
+  main{max-width:1200px;margin:0 auto;padding:4px 16px 320px}
+  h2{font-size:17px;margin:22px 0 10px;letter-spacing:-.01em}
+  .rowscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity;scrollbar-width:none}
+  .rowscroll::-webkit-scrollbar{display:none}
+  .rowscroll .cardv{flex:0 0 46%;max-width:240px;scroll-snap-align:start}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px 10px}
+  .cardv{background:none;border:none;padding:0;text-align:left;display:block;width:100%}
+  .th{position:relative;aspect-ratio:16/9;border-radius:9px;overflow:hidden;background:linear-gradient(135deg,#1c2836,#101822);display:grid;place-items:center;color:var(--muted);font-size:24px}
+  .th img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .th .dur{position:absolute;right:5px;bottom:5px;background:#000c;font-size:11px;padding:1px 5px;border-radius:4px;color:#fff}
+  .th .badge{position:absolute;left:5px;top:5px;background:var(--accent);color:var(--ink);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px}
+  .cardv:active .th,.cardv:hover .th{outline:2px solid var(--accent)}
+  .ti{font-size:13px;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .ch{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .msg{color:var(--muted);padding:28px 8px;text-align:center}
+  .meta{font-size:13px;color:var(--muted);margin-top:4px}
+  .desc{font-size:13px;line-height:1.45;color:var(--text);opacity:.85;white-space:pre-wrap;overflow-wrap:anywhere;max-height:5.8em;overflow:hidden;margin-top:6px}
+  .desc.open{max-height:40vh;overflow-y:auto}
+  .more{background:none;border:none;padding:4px 0;color:var(--accent);font-size:13px}
+  .mbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0 4px}
+  .tg{background:#223041;border:1px solid var(--line);border-radius:99px;padding:8px 12px;color:var(--muted);font-size:13px}
+  .tg.on{background:var(--accent);border-color:var(--accent);color:var(--ink);font-weight:700}
+  .mlist{display:grid;margin-top:6px}
+  .mrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .mrow.now{background:#f2a33a1a;border-radius:8px}
+  .mrow.now .ti{color:var(--accent);font-weight:650}
+  .mrow img,.mrow .ph{width:56px;aspect-ratio:16/9;object-fit:cover;border-radius:5px;background:var(--panel);flex:none;display:grid;place-items:center;color:var(--muted)}
+  .mrow .mt{flex:1;min-width:0}
+  .mrow .ti{margin:0;-webkit-line-clamp:1}
+  .mn{width:22px;text-align:right;color:var(--muted);font-size:12px;flex:none}
+  .mv{background:#223041;border:1px solid var(--line);border-radius:8px;width:36px;height:34px;color:var(--text);flex:none}
+  .pc{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+  .pc .tg{padding:6px 10px}
+  body.playing .queue{bottom:150px}
+  .sorth{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .sorth select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px}
+  .msg.err{color:var(--err)}
+  .skel{flex:0 0 46%;max-width:240px;aspect-ratio:16/9;border-radius:9px;background:var(--panel);animation:p 1.2s infinite alternate}
+  @keyframes p{to{opacity:.4}}
+  .keybox{max-width:380px;margin:12vh auto 0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:10px}
+  .keybox input{background:#0b1017;border:1px solid var(--line);border-radius:10px;padding:12px}
+  .btn{background:var(--accent);color:var(--ink);border:none;border-radius:10px;padding:12px 14px;font-weight:700}
+  .btn.sec{background:#223041;color:var(--text)}
+  .btn.danger{background:var(--err);color:#fff}
+  .btn:disabled{opacity:.5}
+  .scrim{position:fixed;inset:0;background:#000a;z-index:20;display:none;align-items:flex-end;justify-content:center}
+  .scrim.on{display:flex}
+  .sheet{width:100%;max-width:520px;background:var(--panel);border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom));display:grid;gap:12px}
+  .sheet .th{max-height:220px}
+  .sheet h3{margin:0;font-size:16px}
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .acts select{grid-column:1/-1;background:#0b1017;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .queue{position:fixed;left:12px;right:12px;bottom:12px;z-index:15;display:grid;gap:6px;max-width:520px;margin:0 auto;pointer-events:none}
+  .q{background:#1b2735f5;border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:13px;pointer-events:auto}
+  .q.err{border-color:var(--err)}
+  .q .pb{height:4px;border-radius:4px;background:#0b1017;margin-top:6px;overflow:hidden}
+  .q .pb i{display:block;height:100%;background:var(--accent);transition:width .3s}
+  .q .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player{position:fixed;left:0;right:0;bottom:0;z-index:10;background:#0b1017f5;border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:none}
+  .player.on{display:block}
+  .player .in{max-width:900px;margin:0 auto}
+  .player video{width:100%;max-height:46vh;border-radius:10px;background:#000}
+  .player audio{width:100%}
+  .now{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-bottom:6px}
+  .now span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .x{background:none;border:none;color:var(--muted);padding:0 4px}
+  .tools{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--muted);font-size:13px}
+  .del{position:absolute;right:5px;top:5px;background:#000b;border:none;border-radius:6px;color:#fff;font-size:12px;padding:3px 7px}
+  @media (min-width:700px){.rowscroll .cardv,.skel{flex-basis:22%}.grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
+</style>
+</head>
+<body>
+<div class="top" id="top" hidden>
+  <div class="bar">
+    <div class="logo"><img src="icon.svg" alt=""><div><b>Offline</b><small>Entertainment</small></div></div>
+    <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Facebook, TikTok…)" enterkeyhint="search" autocomplete="off">
+    <span class="net" id="net">en línea</span>
+  </div>
+  <nav id="nav"></nav>
+</div>
+<main id="main"></main>
+
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="queue" id="queue"></div>
+<div class="player" id="player"><div class="in"><div class="now"><span id="now"></span><button class="x" id="close" aria-label="Cerrar reproductor">✕</button></div><div id="slot"></div>
+  <div class="pc" id="pctl" hidden><button class="tg" id="pprev" aria-label="Anterior">⏮ Anterior</button><button class="tg" id="pnext" aria-label="Siguiente">Siguiente ⏭</button><button class="tg" id="pshuf">🔀 Aleatorio</button><button class="tg" id="prep">🔁 Repetir</button></div></div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mb = b => b > 1e9 ? (b/1e9).toFixed(1)+' GB' : Math.max(1, Math.round(b/1e6))+' MB';
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const ago = ts => { if (!ts) return ''; const d = (Date.now()/1000 - ts) / 86400;
+  if (d < 1) return 'hoy'; if (d < 2) return 'ayer'; if (d < 7) return `hace ${Math.floor(d)} días`;
+  if (d < 30) { const n = Math.floor(d/7); return `hace ${n} semana${n > 1 ? 's' : ''}`; }
+  if (d < 360) { const n = Math.max(1, Math.floor(d/30)); return `hace ${n} mes${n > 1 ? 'es' : ''}`; }
+  const n = Math.max(1, Math.floor(d/365)); return `hace ${n} año${n > 1 ? 's' : ''}`; };
+const fecha = ymd => ymd ? `${+ymd.slice(6,8)} ${MESES[+ymd.slice(4,6)-1]} ${ymd.slice(0,4)}` : '';
+const vistas = n => n == null ? '' : n >= 1e6 ? `${(n/1e6).toFixed(1).replace('.0','').replace('.',',')} M de vistas` : n >= 1e3 ? `${Math.round(n/1e3)} mil vistas` : `${n} vistas`;
+let order = '', searchTok = 0, stype = 'videos', lastQ = '';   // pestaña del buscador: videos | playlists   // '' relevancia | 'new' mas nuevos | 'old' mas antiguos
+const dur = s => { if (!s) return ''; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = String(s%60).padStart(2,'0'); return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
+const kindOf = n => /\.(mp3|m4a|opus|ogg)$/i.test(n) ? 'audio' : 'video';
+const titleOf = n => n.replace(/\.[^.]+$/, '').replace(/\s*\[[^\]]+\]$/, '').replace(/\s*\{[^}]+\}$/, '');
+const MIME = {mp3:'audio/mpeg', m4a:'audio/mp4', opus:'audio/ogg', ogg:'audio/ogg', mp4:'video/mp4', webm:'video/webm', mkv:'video/x-matroska', thumb:'image/jpeg'};
+const SECTIONS = [
+  {k:'musica',   t:'Música',    q:'música',    mode:'audio'},
+  {k:'noticias', t:'Noticias',  q:'noticias de hoy', mode:'video'},
+  {k:'series',   t:'Series',    q:'series',    mode:'video'},
+  {k:'peliculas',t:'Películas', q:'películas', mode:'video'},
+];
+let online = false;  // conexion REAL con el servidor (navigator.onLine solo dice si hay wifi/datos)
+// clave por enlace (http://.../#k=CLAVE): el fragmento no llega al servidor; se guarda y se borra de la barra
+(() => { const k = new URLSearchParams(location.hash.slice(1)).get('k');
+  if (k){ try { localStorage.setItem('vk', k); } catch {} history.replaceState(null, '', location.pathname + location.search); } })();
+let key = localStorage.getItem('vk') || '', view = 'inicio', library = [], current = null, objUrl = null, thumbUrls = {}, libFilter = 'all';
+const cache = new Map();
+
+// ---------- almacenamiento en el dispositivo (OPFS; IndexedDB de respaldo)
+const store = {
+  async init(){
+    try {
+      this.root = await navigator.storage.getDirectory();
+      const t = await this.root.getFileHandle('.probe', {create:true});
+      if (!t.createWritable) throw new Error('sin createWritable');
+      await this.root.removeEntry('.probe'); this.mode = 'opfs';
+    } catch {
+      this.mode = 'idb';
+      this.db = await new Promise((ok, no) => { const r = indexedDB.open('offline-entertainment', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('files', {keyPath:'name'});
+        r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+    }
+    if (navigator.storage?.persist) navigator.storage.persist();
+  },
+  tx(mode, fn){ return new Promise((ok, no) => { const t = this.db.transaction('files', mode); const r = fn(t.objectStore('files')); t.oncomplete = () => ok(r.result); t.onerror = () => no(t.error); }); },
+  async save(name, response, onProgress = () => {}){
+    const reader = response.body.getReader(), total = +response.headers.get('Content-Length') || 0; let done = 0;
+    if (this.mode === 'opfs'){
+      const h = await this.root.getFileHandle(name, {create:true}), w = await h.createWritable();
+      try { for(;;){ const {value, done: end} = await reader.read(); if (end) break; await w.write(value); done += value.length; onProgress(total ? done*100/total : 0); }
+        await w.close(); if (total && done !== total) throw new Error('Transferencia incompleta');
+      } catch (e) { try { await w.abort(); } catch {} try { await this.root.removeEntry(name); } catch {} throw e; }
+    } else {
+      const parts = [];
+      for(;;){ const {value, done: end} = await reader.read(); if (end) break; parts.push(value); done += value.length; onProgress(total ? done*100/total : 0); }
+      if (total && done !== total) throw new Error('Transferencia incompleta');
+      const blob = new Blob(parts, {type: MIME[name.split('.').pop().toLowerCase()] || ''});
+      await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob}));
+    }
+  },
+  async list(){
+    const out = [];
+    if (this.mode === 'opfs'){
+      for await (const [name, h] of this.root.entries()){
+        if (h.kind !== 'file' || name.startsWith('.') || name.endsWith('.crswap')) continue;
+        const f = await h.getFile(); out.push({name, size: f.size, mtime: f.lastModified});
+      }
+    } else for (const r of await this.tx('readonly', s => s.getAll())) out.push({name: r.name, size: r.size, mtime: r.mtime});
+    return out.sort((a, b) => b.mtime - a.mtime);
+  },
+  async blob(name){
+    if (this.mode === 'opfs'){
+      const f = await (await this.root.getFileHandle(name)).getFile();
+      return f.type ? f : new File([f], name, {type: MIME[name.split('.').pop().toLowerCase()] || ''});
+    }
+    return (await this.tx('readonly', s => s.get(name))).blob;
+  },
+  async remove(name){ try { if (this.mode === 'opfs') await this.root.removeEntry(name); else await this.tx('readwrite', s => s.delete(name)); } catch {} },
+};
+
+// ---------- servidor
+function ytLink(s){
+  try {
+    const u = new URL(s), h = u.hostname.toLowerCase().replace(/^(www|m|music)\./, ''), p = u.pathname.split('/').filter(Boolean);
+    if (h !== 'youtube.com' && h !== 'youtu.be' && h !== 'youtube-nocookie.com') return null;
+    const list = u.searchParams.get('list') || '', okList = /^[\w-]{12,80}$/.test(list);
+    if (h === 'youtube.com' && p[0] === 'playlist') return okList ? {type: 'playlist', id: list} : null;
+    if (h === 'youtube.com' && p[0] && p[0].startsWith('@')) return {type: 'artist', id: decodeURIComponent(p[0])};
+    if (h === 'youtube.com' && p[0] === 'channel' && /^UC[\w-]{22}$/.test(p[1] || '')) return {type: 'artist', id: p[1]};
+    const id = ytId(s); if (id) return {type: 'video', id, list: okList ? list : ''};
+    return null;
+  } catch { return null; }
+}
+function ytId(s){
+  try {
+    const u = new URL(s), h = u.hostname.toLowerCase().replace(/^(www|m|music)\./, ''), p = u.pathname.split('/').filter(Boolean);
+    let id = '';
+    if (h === 'youtu.be') id = p[0] || '';
+    else if (h === 'youtube.com' || h === 'youtube-nocookie.com') id = p[0] === 'watch' ? (u.searchParams.get('v') || '') : (['shorts','live','embed','v'].includes(p[0]) ? p[1] || '' : '');
+    return /^[\w-]{11}$/.test(id) ? id : '';
+  } catch { return ''; }
+}
+async function api(path, opts = {}){
+  let r;
+  try { r = await fetch(path, {...opts, headers: {'X-Key': key, ...(opts.headers || {})}}); }
+  catch (e) { setOnline(false); throw new Error('Sin conexión'); }
+  if (r.status === 401){ key = ''; localStorage.removeItem('vk'); showKey('Clave incorrecta'); throw new Error('Clave incorrecta'); }
+  return r;
+}
+async function search(q, n = 12, sort = ''){
+  const id = n + '|' + sort + '|' + q; if (cache.has(id)) return cache.get(id);
+  const r = await api(`api/search?n=${n}&sort=${sort}&q=${encodeURIComponent(q)}`), j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'No se pudo buscar');
+  cache.set(id, j); return j;
+}
+
+// ---------- clave (se pide una sola vez por dispositivo)
+function showKey(msg){
+  $('#top').hidden = true;
+  $('#main').innerHTML = `<form class="keybox" id="kf"><div class="logo"><img src="icon.svg" alt=""><div><b>Offline</b><small>Entertainment</small></div></div>
+    <div class="ch">Escribe tu clave. Solo se pide una vez en este dispositivo.</div>
+    <input type="password" id="key" placeholder="Clave privada" autocomplete="current-password" required>
+    <button class="btn">Entrar</button><div class="ch" style="color:var(--err)">${esc(msg || '')}</div></form>`;
+  $('#kf').onsubmit = async e => { e.preventDefault(); key = $('#key').value.trim();
+    try { if ((await api('api/ping')).ok){ localStorage.setItem('vk', key); online = true; start(); } } catch {} };
+}
+
+// ---------- vistas
+function nav(){
+  const tabs = [{k:'inicio', t:'Inicio'}, ...SECTIONS, {k:'descargas', t:`Mis descargas${library.length ? ' · ' + library.length : ''}`}];
+  $('#nav').innerHTML = (online ? tabs : tabs.slice(-1)).map(t => `<button data-v="${t.k}" class="${view === t.k ? 'on' : ''}">${esc(t.t)}</button>`).join('');
+}
+$('#nav').onclick = e => { const b = e.target.closest('button'); if (b){ $('#q').value = ''; go(b.dataset.v); } };
+const saved = id => library.some(f => f.name.includes(`[${id}]`));
+const card = (v, mode) => `<button class="cardv" data-id="${esc(v.id)}" data-mode="${mode}">
+  <div class="th"><img loading="lazy" src="${esc(v.thumb)}" alt="" onerror="this.remove()">${saved(v.id) ? '<span class="badge">Guardado</span>' : ''}${v.duration ? `<span class="dur">${dur(v.duration)}</span>` : ''}</div>
+  <div class="ti">${esc(v.title)}</div><div class="ch">${esc(v.channel)}${v.ts ? ' · ' + ago(v.ts) : ''}</div></button>`;
+const known = new Map();
+const remember = list => (list.forEach(v => known.set(v.id, v)), list);
+
+async function go(v, query){
+  view = v; nav(); window.scrollTo(0, 0);
+  const main = $('#main');
+  if (v === 'descargas') return renderLibrary();
+  if (v === 'inicio' && !query){
+    main.innerHTML = `<div id="parati"></div>` + (library.length ? '<h2 style="opacity:.7">Explorar</h2>' : '') +
+      SECTIONS.map(s => `<h2>${s.t}</h2><div class="rowscroll" id="r-${s.k}">${'<div class="skel"></div>'.repeat(4)}</div>`).join('');
+    forYou();
+    for (const s of SECTIONS){
+      search(s.q, 10).then(list => { if (view === 'inicio' && $('#r-' + s.k)) $('#r-' + s.k).innerHTML = remember(list).map(x => card(x, s.mode)).join('') || '<div class="msg">Sin resultados</div>'; })
+        .catch(e => { if ($('#r-' + s.k)) $('#r-' + s.k).innerHTML = `<div class="msg err">${esc(e.message)}</div>`; });
+    }
+    return;
+  }
+  const sec = SECTIONS.find(s => s.k === v), mode = sec ? sec.mode : 'video';
+  const q = query ? (sec ? `${query} ${sec.t.toLowerCase()}` : query) : sec.q;
+  if (q !== lastQ){ lastQ = q; stype = 'videos'; }   // cada busqueda nueva abre en "Videos"
+  const head = () => `<div class="sorth"><h2>${esc(query ? `Resultados: ${query}` : sec.t)}</h2>
+    ${stype === 'videos' ? `<select id="ord" aria-label="Ordenar"><option value="">Más relevantes</option><option value="new">Más nuevos primero</option><option value="old">Más antiguos primero</option></select>` : ''}</div>
+    <div class="mbar" role="tablist"><button class="tg ${stype === 'videos' ? 'on' : ''}" data-st="videos" role="tab">Videos</button><button class="tg ${stype === 'playlists' ? 'on' : ''}" data-st="playlists" role="tab">Playlists</button></div>`;
+  const wire = () => { const o = $('#ord'); if (o){ o.value = order; o.onchange = () => { order = o.value; go(v, query); }; }
+    document.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { if (stype !== b.dataset.st){ stype = b.dataset.st; go(v, query); } }); };
+  const tok = ++searchTok;
+  main.innerHTML = head() + '<div id="res"><div class="msg">Buscando…</div></div>'; wire();
+  if (stype === 'playlists'){
+    try {
+      const k = 'pl|' + q, pls = cache.get(k) || await getJSON('api/playlists?q=' + encodeURIComponent(q)); cache.set(k, pls);
+      if (tok !== searchTok || !$('#res')) return;
+      $('#res').innerHTML = pls.length ? `<div class="grid">${pls.map(p => `<button class="cardv" data-list="${esc(p.id)}">
+        <div class="th">${p.thumb ? `<img loading="lazy" src="${esc(p.thumb)}" alt="" onerror="this.remove()">` : ''}<span class="badge">Playlist</span></div>
+        <div class="ti">${esc(p.title)}</div><div class="ch">${esc(p.channel)}</div></button>`).join('')}</div>` : '<div class="msg">No se encontraron playlists.</div>';
+    } catch (e) { if (tok === searchTok && $('#res')) $('#res').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+    return;
+  }
+  try {
+    const list = remember(await search(q, 24, order));
+    if (tok !== searchTok || !$('#res')) return;
+    $('#res').innerHTML = (order ? '<div class="meta" style="margin:-4px 0 10px">Fechas aproximadas, entre los 40 resultados más relevantes.</div>' : '') + (list.length ? `<div class="grid">${list.map(x => card(x, mode)).join('')}</div>` : '<div class="msg">Sin resultados</div>');
+  } catch (e) { if (tok === searchTok && $('#res')) $('#res').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+// ---------- "Para ti": relacionado con lo que bajaste en ESTE dispositivo (sin cuenta, nada se guarda en el servidor)
+const idOf = name => (name.match(/\[([\w-]{11})\]\.[^.]+$/) || [])[1] || '';
+async function getJSON(path){ const r = await api(path), j = await r.json(); if (!r.ok) throw new Error(j.error || 'Error'); return j; }
+async function forYou(){
+  const box = $('#parati'); if (!box) return;
+  const seeds = []; const seen = new Set();
+  for (const f of library){ const id = idOf(f.name); if (id && !seen.has(id)){ seen.add(id); seeds.push({id, title: f.title, mode: f.kind}); } if (seeds.length >= 6) break; }
+  if (!seeds.length) return;
+  const used = new Set(library.map(f => idOf(f.name)));            // nunca sugerir lo ya guardado
+  const take = (list, n = 12) => list.filter(x => !used.has(x.id) && (used.add(x.id), true)).slice(0, n);
+  const row = (id, title) => { const d = document.createElement('div');
+    d.innerHTML = `<h2>${esc(title)}</h2><div class="rowscroll" id="${id}">${'<div class="skel"></div>'.repeat(4)}</div>`; box.append(d); return d; };
+  const fill = (d, list, mode) => { if (!$('#parati')) return; if (!list.length) return d.remove();
+    d.querySelector('.rowscroll').innerHTML = remember(list).map(x => card(x, mode)).join(''); };
+  const short = t => t.length > 42 ? t.slice(0, 40) + '…' : t;
+  // filas en orden fijo, se llenan a medida que llegan
+  const rows = seeds.slice(0, 3).map((sd, i) => row('pt-' + i, `Porque guardaste «${short(sd.title)}»`));
+  const results = await Promise.all(seeds.map(sd => getJSON('api/related?id=' + sd.id).catch(() => ({seed: null, items: []}))));
+  if (view !== 'inicio' || !$('#parati')) return;
+  for (let i = 0; i < rows.length; i++){
+    let list = results[i].items;
+    if (!list.length) try { list = await search(seeds[i].title, 12); } catch { list = []; }
+    fill(rows[i], take(list), seeds[i].mode);
+  }
+  // canales que mas aparecen entre tus descargas recientes
+  const count = {};
+  results.forEach((r, i) => { const s = r.seed; if (s && s.channel_id){ const c = count[s.channel_id] ||= {n: 0, name: s.channel, mode: seeds[i].mode}; c.n++; } });
+  const chans = Object.entries(count).sort((a, b) => b[1].n - a[1].n).slice(0, 2);
+  for (const [cid, c] of chans){
+    const d = row('pc-' + cid, `Más de ${c.name}`);
+    getJSON('api/channel?id=' + cid).then(list => fill(d, take(list), c.mode)).catch(() => d.remove());
+  }
+  // lo que sobra de las mixes de las otras descargas recientes
+  const rest = take(results.slice(3).flatMap(r => r.items), 12);
+  if (rest.length) fill(row('pt-mas', 'Más relacionado con tus descargas'), rest, 'video');
+}
+
+$('#q').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const q = $('#q').value.trim(); if (!q) return; $('#q').blur();
+  if (/^https?:\/\//.test(q)){
+    const L = ytLink(q);
+    // otros sitios (Facebook, TikTok, Instagram...): el servidor dice si es compatible
+    if (!L) return openSheet({id: '', url: q, title: q, channel: 'Enlace', thumb: ''}, 'video');
+    if (L.type !== 'video') return openList(L.type, L.id);
+    return openSheet({id: L.id, list: L.list, title: q, channel: 'Enlace de YouTube', url: `https://www.youtube.com/watch?v=${L.id}`, thumb: `https://i.ytimg.com/vi/${L.id}/mqdefault.jpg`}, 'video');
+  }
+  go(view === 'descargas' ? 'inicio' : view, q);
+});
+$('#main').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  if (del){ e.stopPropagation(); return confirmRemoveItem(del.dataset.del); }
+  const mv = e.target.closest('[data-mv]');
+  if (mv){ e.stopPropagation(); return moveSong(mv.dataset.n, +mv.dataset.mv); }
+  const row = e.target.closest('[data-play]'); if (row) return play(row.dataset.play);
+  const c = e.target.closest('.cardv'); if (!c) return;
+  if (c.dataset.list) return openList('playlist', c.dataset.list);
+  if (c.dataset.name) return play(c.dataset.name);
+  openSheet(known.get(c.dataset.id), c.dataset.mode);
+});
+
+// ---------- hoja de guardado
+function openSheet(v, mode){
+  if (!v) return;
+  $('#sheet').innerHTML = `${v.thumb ? `<div class="th"><img src="${esc(v.thumb)}" alt="">${v.duration ? `<span class="dur">${dur(v.duration)}</span>` : ''}</div>` : ''}
+    <div><h3>${esc(v.title)}</h3><div class="ch">${esc(v.channel)}</div>
+      <div id="vinfo"><div class="meta">${v.id || v.url ? 'Cargando fecha y descripción…' : ''}</div></div></div>
+    <div class="acts">
+      <button class="btn ${mode === 'audio' ? '' : 'sec'}" data-save="audio">Guardar audio</button>
+      <button class="btn ${mode === 'audio' ? 'sec' : ''}" data-save="video">Guardar video</button>
+      <select id="ql" aria-label="Calidad de video"><option value="360">Video en 360p (ocupa menos)</option><option value="480" selected>Video en 480p</option><option value="720">Video en 720p</option></select>
+    </div>
+    <button class="btn sec" data-save="">Cancelar</button>`;
+  $('#sheet').onclick = e => {
+    const g = e.target.closest('[data-goto]');
+    if (g){ $('#scrim').classList.remove('on'); const [t, id] = g.dataset.goto.split('|'); return openList(t, id); }
+    const b = e.target.closest('[data-save]'); if (!b) return;
+    if (b.dataset.save) enqueue(v, b.dataset.save, $('#ql').value); $('#scrim').classList.remove('on'); };
+  $('#scrim').classList.add('on');
+  if (!v.id && v.url) return getJSON('api/link?url=' + encodeURIComponent(v.url)).then(i => {
+    const box = $('#vinfo'); if (!box || !$('#scrim').classList.contains('on')) return;
+    Object.assign(v, {title: i.title || i.site, channel: i.channel, url: i.url, thumb: i.thumb || '', duration: i.duration});
+    $('#sheet h3').textContent = v.title; $('#sheet .ch').textContent = i.site + (i.channel && i.channel !== i.site ? ' · ' + i.channel : '');
+    if (i.thumb) $('#sheet').insertAdjacentHTML('afterbegin', `<div class="th"><img src="${esc(i.thumb)}" alt="">${i.duration ? `<span class="dur">${dur(i.duration)}</span>` : ''}</div>`);
+    const linea = [i.upload_date ? 'Publicado el ' + fecha(i.upload_date) : '', vistas(i.views), i.duration ? dur(i.duration) : ''].filter(Boolean).join(' · ');
+    const d = (i.description || '').trim();
+    box.innerHTML = `<div class="meta">${esc(linea)}</div>` + (d ? `<div class="desc">${esc(d)}</div>` : '');
+  }).catch(e => { const box = $('#vinfo'); if (!box) return;
+    box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; $('#sheet .acts').remove(); });
+  if (v.id) getJSON('api/info?id=' + v.id).then(i => {
+    const box = $('#vinfo'); if (!box || !$('#scrim').classList.contains('on')) return;
+    if (i.title && v.title.startsWith('http')) { v.title = i.title; $('#sheet h3').textContent = i.title; $('#sheet .ch').textContent = i.channel; }
+    const linea = [i.upload_date ? 'Publicado el ' + fecha(i.upload_date) : '', vistas(i.views), i.duration ? dur(i.duration) : ''].filter(Boolean).join(' · ');
+    const d = (i.description || '').trim();
+    box.innerHTML = `<div class="meta">${esc(linea)}</div>` + (d ? `<div class="desc" id="vdesc">${esc(d)}</div>` : '<div class="meta">Sin descripción.</div>');
+    const links = [i.channel_id ? `<button class="tg" data-goto="artist|${esc(i.channel_id)}">Todo de ${esc(i.channel || 'este canal')}</button>` : '',
+                   v.list ? `<button class="tg" data-goto="playlist|${esc(v.list)}">Abrir la playlist completa</button>` : ''].join('');
+    if (links) box.insertAdjacentHTML('beforeend', `<div class="mbar">${links}</div>`);
+    const el = $('#vdesc');
+    if (el && el.scrollHeight > el.clientHeight + 4){ const b = document.createElement('button'); b.className = 'more'; b.textContent = 'Ver más';
+      b.onclick = e => { e.stopPropagation(); const o = el.classList.toggle('open'); b.textContent = o ? 'Ver menos' : 'Ver más'; }; el.after(b); }
+  }).catch(() => { const box = $('#vinfo'); if (box) box.innerHTML = '<div class="meta">No se pudo cargar la descripción.</div>'; });
+}
+$('#scrim').onclick = e => { if (e.target === $('#scrim')) $('#scrim').classList.remove('on'); };
+
+// ---------- descarga de un video (comun a la cola simple y a las playlists)
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function downloadOne(v, mode, quality, set){
+  let r = await api('api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: v.id, url: v.url, mode, quality})});
+  let j = await r.json(); if (!r.ok){ const e = new Error(j.error); e.retry = j.retry; throw e; }
+  while (!['listo','error'].includes(j.status)){
+    await sleep(1000);
+    r = await api('api/jobs/' + j.id); j = await r.json(); if (!r.ok) throw new Error(j.error);
+    set(j.status === 'descargando' ? `Preparando… ${j.progress}%` : 'Preparando…', j.progress / 2);
+  }
+  if (j.status === 'error') throw new Error(j.error);
+  r = await api(`api/jobs/${j.id}/file`); if (!r.ok) throw new Error((await r.json()).error);
+  await store.save(j.filename, r, p => set(`Guardando… ${Math.round(p)}%`, 50 + p / 2));
+  if (v.id) try { const t = await api('api/thumb?id=' + encodeURIComponent(v.id)); if (t.ok) await store.save(j.filename + '.thumb', t); } catch {}
+  else if ((v.thumb || '').startsWith('data:image/')) try { await store.save(j.filename + '.thumb', await fetch(v.thumb)); } catch {}
+  await refresh();
+}
+
+// ---------- cola simple (una a la vez)
+let chain = Promise.resolve();
+function enqueue(v, mode, quality){
+  const el = document.createElement('div'); el.className = 'q';
+  el.innerHTML = `<div class="t">${esc(v.title)}</div><div class="ch">En cola…</div><div class="pb"><i style="width:0"></i></div>`;
+  $('#queue').append(el);
+  const set = (txt, pct) => { el.children[1].textContent = txt; if (pct != null) el.querySelector('i').style.width = pct + '%'; };
+  chain = chain.then(async () => {
+    try {
+      await downloadOne(v, mode, quality, set);
+      set('Guardado. Ya puedes verlo sin conexión.', 100); el.querySelector('i').style.background = 'var(--ok)';
+      setTimeout(() => el.remove(), 3500);
+    } catch (err) { el.classList.add('err'); set('No se pudo: ' + err.message); el.onclick = () => el.remove(); setTimeout(() => el.remove(), 15000); }
+  });
+}
+
+// ---------- playlists / artistas: descarga en lote como audio (sigue sola si cierras y vuelves)
+const LS = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } };
+const LSset = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let batch = LS('vbatch', null), batchRunning = false, batchEl = null;
+const saveBatch = () => LSset('vbatch', batch && batch.items.length ? batch : null);
+function addBatch(title, items){
+  const have = new Set(library.map(f => idOf(f.name)));
+  if (!batch) batch = {title, items: [], done: 0, fail: 0};
+  else if (batch.title !== title) batch.title = 'Varias listas';
+  const inq = new Set(batch.items.map(x => x.id));
+  const add = items.filter(x => !have.has(x.id) && !inq.has(x.id)).map(x => ({id: x.id, title: x.title}));
+  batch.items.push(...add); saveBatch(); runBatch(); return add.length;
+}
+async function runBatch(){
+  if (batchRunning || !batch || !batch.items.length || !online) return;
+  batchRunning = true;
+  if (!batchEl){ batchEl = document.createElement('div'); batchEl.className = 'q';
+    batchEl.innerHTML = `<div class="t"></div><div class="ch"></div><div class="pb"><i style="width:0"></i></div><button class="more">Detener</button>`;
+    $('#queue').prepend(batchEl);
+    batchEl.querySelector('.more').onclick = () => { if (batch) batch.items = []; saveBatch(); batchEl.querySelector('.more').remove(); }; }
+  const [t, c] = batchEl.children, bar = batchEl.querySelector('i');
+  while (batch && batch.items.length && online){
+    const it = batch.items[0], total = batch.done + batch.fail + batch.items.length;
+    t.textContent = `${batch.title}: ${batch.done + batch.fail + 1} de ${total}`;
+    try {
+      await downloadOne({...it, url: `https://www.youtube.com/watch?v=${it.id}`}, 'audio', '480',
+        (txt, pct) => { c.textContent = `${it.title} — ${txt}`; if (pct != null) bar.style.width = pct + '%'; });
+      batch.done++;
+    } catch (e) {
+      if (e.retry && batch.items.length){ c.textContent = e.retry > 60 ? `Límite por hora alcanzado: sigue sola en ${Math.round(e.retry / 60)} min…` : 'Esperando turno en el servidor…'; await sleep(e.retry * 1000); continue; }
+      if (!online) break;
+      batch.fail++;
+    }
+    batch.items.shift(); saveBatch();
+  }
+  batchRunning = false;
+  if (batch && batch.items.length){ c.textContent = 'En pausa: sin conexión. Sigue sola cuando vuelva internet.'; return; }
+  if (batch){ t.textContent = `${batch.title}: listo`; c.textContent = `${batch.done} guardadas${batch.fail ? ` · ${batch.fail} no se pudieron (borradas o bloqueadas)` : ''}.`; bar.style.width = '100%'; bar.style.background = 'var(--ok)'; }
+  const el = batchEl; batch = null; batchEl = null; saveBatch(); setTimeout(() => el.remove(), 8000);
+}
+
+// ---------- vista de playlist o artista
+async function openList(kind, id){
+  view = 'lista'; nav(); window.scrollTo(0, 0);
+  const main = $('#main'); main.innerHTML = '<div class="msg">Cargando la lista…</div>';
+  let L;
+  try { L = await getJSON(`api/${kind}?id=${encodeURIComponent(id)}`); }
+  catch (e) { if (view === 'lista') main.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
+  if (view !== 'lista') return;
+  const items = remember(L.items), have = new Set(library.map(f => idOf(f.name))), falta = items.filter(x => !have.has(x.id)).length;
+  main.innerHTML = `<h2>${esc(L.title || (kind === 'artist' ? 'Canal' : 'Playlist'))}</h2>
+    <div class="meta">${esc([L.owner, `${items.length} ${kind === 'artist' ? 'videos recientes' : 'canciones'}`, falta < items.length ? `${items.length - falta} ya guardadas` : ''].filter(Boolean).join(' · '))}</div>
+    <div class="mbar">${falta ? `<button class="btn" id="dlall">⬇ Descargar todo en audio (${falta})</button>` : '<span class="meta">Ya tienes todo guardado.</span>'}<button class="tg" id="plsave">♫ Guardar como playlist</button></div>
+    <div class="meta" style="margin-bottom:6px">Se guardan de a una; puedes seguir usando la app. Si la cierras, sigue sola al volver a abrirla.</div>
+    <div class="grid">${items.map(x => card(x, 'audio')).join('')}</div>`;
+  $('#plsave').onclick = () => { savePlaylist(kind + ':' + id, L.title || 'Playlist', items); $('#plsave').textContent = '✓ En Mis descargas → filtro'; };
+  const b = $('#dlall');
+  if (b) b.onclick = () => { savePlaylist(kind + ':' + id, L.title || 'Playlist', items); const n = addBatch(L.title || 'Playlist', items); b.disabled = true; b.textContent = n ? `En cola: ${n} canciones` : 'Ya estaban en cola'; };
+}
+// ---------- biblioteca
+async function refresh(){
+  const all = await store.list();
+  const thumbs = new Set(all.filter(f => f.name.endsWith('.thumb')).map(f => f.name));
+  library = all.filter(f => !f.name.endsWith('.thumb')).map(f => ({...f, kind: kindOf(f.name), title: titleOf(f.name), thumb: thumbs.has(f.name + '.thumb')}));
+  for (const f of library) if (f.thumb && !thumbUrls[f.name]) try { thumbUrls[f.name] = URL.createObjectURL(await store.blob(f.name + '.thumb')); } catch {}
+  nav(); if (view === 'descargas') renderLibrary();
+}
+// ---------- musica: todo lo que bajas es una playlist (orden propio, aleatorio, repetir)
+let shuffle = LS('mshuf', false), repeat = LS('mrep', true), sorting = false, queue = [], qi = -1, queueScope = 'audio', playErr = 0;
+// playlists descargadas en ESTE dispositivo: {"playlist:PL..": {title, items:[{id,title}]}} (orden original)
+const pls = () => LS('vpls', {});
+function savePlaylist(key, title, items){ const all = pls(); all[key] = {title, items: items.map(x => ({id: x.id, title: x.title}))}; LSset('vpls', all); }
+const isPl = f => f.startsWith('pl:');
+// canciones de un alcance: 'audio' = toda la musica (orden propio) | 'pl:<clave>' = una playlist (su orden)
+function music(scope = 'audio'){
+  const aud = library.filter(i => i.kind === 'audio');
+  if (isPl(scope)){
+    const p = pls()[scope.slice(3)]; if (!p) return [];
+    const by = new Map(aud.map(i => [idOf(i.name), i]));
+    return p.items.map(x => by.get(x.id)).filter(Boolean);
+  }
+  const pos = new Map(LS('morder', []).map((n, i) => [n, i]));
+  return [...aud.filter(i => pos.has(i.name)).sort((a, b) => pos.get(a.name) - pos.get(b.name)),
+          ...aud.filter(i => !pos.has(i.name)).sort((a, b) => a.mtime - b.mtime)];   // lo nuevo, al final y en el orden en que se bajo
+}
+const scopeOf = f => isPl(f) ? f : 'audio';
+function moveSong(name, d){
+  const scope = scopeOf(libFilter), l = music(scope), i = l.findIndex(x => x.name === name), j = i + d;
+  if (i < 0 || j < 0 || j >= l.length) return;
+  if (isPl(scope)){
+    const all = pls(), p = all[scope.slice(3)], it = p.items, a = it.findIndex(x => x.id === idOf(l[i].name)), b = it.findIndex(x => x.id === idOf(l[j].name));
+    [it[a], it[b]] = [it[b], it[a]]; LSset('vpls', all);
+  } else { [l[i], l[j]] = [l[j], l[i]]; LSset('morder', l.map(x => x.name)); }
+  if (current && queue.length && !shuffle && queueScope === scope){ queue = music(scope).map(x => x.name); qi = queue.indexOf(current); }
+  renderLibrary();
+}
+function buildQueue(start, scope = queueScope){
+  queueScope = scope;
+  const names = music(scope).map(i => i.name);
+  if (!shuffle){ queue = names; qi = Math.max(0, names.indexOf(start)); return; }
+  const rest = names.filter(n => n !== start);
+  for (let i = rest.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+  queue = start ? [start, ...rest] : rest; qi = 0;
+}
+function playAll(){ const sc = scopeOf(libFilter), l = music(sc); if (!l.length) return; buildQueue(shuffle ? null : l[0].name, sc); playErr = 0; playAudio(queue[qi]); }
+function step(d){
+  if (!queue.length) return;
+  let n = qi + d;
+  if (n >= queue.length){ if (!repeat) return; if (shuffle){ buildQueue(null); n = 0; } else n = 0; }
+  qi = Math.max(0, n); playAudio(queue[qi]);
+}
+// si una cancion no se puede reproducir, se salta (sin quedar en bucle si fallan todas)
+function skipBroken(){ if (++playErr < queue.length) step(1); else { playErr = 0; $('#now').textContent = 'No se pudo reproducir ninguna canción de la lista'; } }
+function setShuffle(v){ shuffle = v; LSset('mshuf', v); if (current && queue.length) buildQueue(current); ctl(); if (view === 'descargas') renderLibrary(); }
+function setRepeat(v){ repeat = v; LSset('mrep', v); ctl(); if (view === 'descargas') renderLibrary(); }
+function ctl(){ $('#pshuf').classList.toggle('on', shuffle); $('#prep').classList.toggle('on', repeat); }
+$('#pprev').onclick = () => step(-1); $('#pnext').onclick = () => step(1);
+$('#pshuf').onclick = () => setShuffle(!shuffle); $('#prep').onclick = () => setRepeat(!repeat);
+
+async function renderLibrary(){
+  const items = library.filter(i => libFilter === 'all' || i.kind === libFilter);
+  let info = `${library.length} guardados · ${mb(library.reduce((a, f) => a + f.size, 0))}`;
+  try { const e = await navigator.storage.estimate(); if (e.quota) info += ` · libre aprox. ${mb(e.quota - e.usage)}`; } catch {}
+  if (view !== 'descargas') return;
+  const all = pls();
+  if (isPl(libFilter) && !all[libFilter.slice(3)]) libFilter = 'all';
+  const P = isPl(libFilter) ? all[libFilter.slice(3)] : null, asList = libFilter === 'audio' || !!P;
+  const mus = music(scopeOf(libFilter)), y = window.scrollY, falta = P ? P.items.filter(x => !mus.some(i => idOf(i.name) === x.id)) : [];
+  const bar = (mus.length || P) && libFilter !== 'video' ? `<div class="mbar">${mus.length ? `<button class="btn" id="mplay">▶ ${P ? 'Reproducir esta playlist' : 'Reproducir música'} (${mus.length})</button>
+      <button class="tg ${shuffle ? 'on' : ''}" id="mshuf">🔀 Aleatorio</button><button class="tg ${repeat ? 'on' : ''}" id="mrep">🔁 Repetir</button>` : ''}
+      ${asList ? (mus.length > 1 ? `<button class="tg ${sorting ? 'on' : ''}" id="msort">↕ ${sorting ? 'Listo' : 'Cambiar orden'}</button>` : '') : `<button class="tg" id="mlist">Ver lista de canciones</button>`}
+      ${P && falta.length && online ? `<button class="tg" id="mfalta">⬇ Bajar las que faltan (${falta.length})</button>` : ''}
+      ${P ? `<button class="tg" id="mquitar">Quitar playlist</button>` : ''}</div>` : '';
+  const body = asList
+    ? (mus.length ? `<div class="mlist">${mus.map((i, k) => `<div class="mrow ${i.name === current ? 'now' : ''}" ${sorting ? '' : `data-play="${esc(i.name)}"`}>
+        <span class="mn">${i.name === current ? '♪' : k + 1}</span>${thumbUrls[i.name] ? `<img src="${thumbUrls[i.name]}" alt="">` : '<span class="ph">♪</span>'}
+        <div class="mt"><div class="ti">${esc(i.title)}</div><div class="ch">${mb(i.size)}</div></div>
+        ${sorting ? `<button class="mv" data-mv="-1" data-n="${esc(i.name)}" aria-label="Subir" ${k ? '' : 'style="visibility:hidden"'}>▲</button><button class="mv" data-mv="1" data-n="${esc(i.name)}" aria-label="Bajar" ${k < mus.length - 1 ? '' : 'style="visibility:hidden"'}>▼</button>` : ''}</div>`).join('')}</div>`
+       : `<div class="msg">${P ? 'Todavía no se bajó ninguna canción de esta playlist.' : 'No hay música guardada.'}</div>`)
+    : (items.length ? `<div class="grid">${items.map(i => `
+      <button class="cardv" data-name="${esc(i.name)}"><div class="th">${thumbUrls[i.name] ? `<img src="${thumbUrls[i.name]}" alt="">` : (i.kind === 'audio' ? '♪' : '▶')}
+        <span class="badge">${i.kind === 'audio' ? 'Audio' : 'Video'}</span><span class="dur">${mb(i.size)}</span>
+        <span class="del" data-del="${esc(i.name)}" role="button" aria-label="Borrar">Borrar</span></div>
+        <div class="ti">${esc(i.title)}</div></button>`).join('')}</div>`
+      : `<div class="msg">${online ? 'Aún no guardaste nada. Elige algo en Inicio.' : 'No hay nada guardado en este dispositivo.'}</div>`);
+  $('#main').innerHTML = `<div class="tools"><span>${info}</span>
+      <select id="lf" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px"><option value="all">Todo</option><option value="audio">Música</option><option value="video">Videos</option>${Object.keys(all).length ? `<optgroup label="Playlists">${Object.entries(all).map(([k, p]) => `<option value="pl:${esc(k)}">♫ ${esc(p.title)}</option>`).join('')}</optgroup>` : ''}</select></div>
+    <h2>${P ? esc(P.title) : 'Mis descargas'}</h2>${P ? `<div class="meta">${mus.length} de ${P.items.length} canciones guardadas</div>` : ''}` + bar + body;
+  $('#lf').value = libFilter; $('#lf').onchange = e => { libFilter = e.target.value; sorting = false; renderLibrary(); };
+  if ($('#mplay')) $('#mplay').onclick = playAll;
+  if ($('#mshuf')) $('#mshuf').onclick = () => setShuffle(!shuffle);
+  if ($('#mrep')) $('#mrep').onclick = () => setRepeat(!repeat);
+  if ($('#msort')) $('#msort').onclick = () => { sorting = !sorting; renderLibrary(); };
+  if ($('#mfalta')) $('#mfalta').onclick = () => { const n = addBatch(P.title, falta); $('#mfalta').textContent = n ? `En cola: ${n}` : 'Ya estaban en cola'; };
+  if ($('#mquitar')) $('#mquitar').onclick = () => confirmRemovePl(libFilter.slice(3), P.title);
+  if ($('#mlist')) $('#mlist').onclick = () => { libFilter = 'audio'; renderLibrary(); };
+  window.scrollTo(0, y);
+}
+// quitar una playlist SOLO borra la agrupacion; las canciones quedan en Mis descargas
+function confirmRemovePl(key, title){
+  $('#sheet').innerHTML = `<div><h3>¿Quitar la playlist «${esc(title)}»?</h3>
+    <div class="meta">Las canciones no se borran: siguen en Mis descargas → Música.</div></div>
+    <div class="acts"><button class="btn sec" data-r="no">Cancelar</button><button class="btn danger" data-r="si">Quitar playlist</button></div>`;
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return;
+    if (b.dataset.r === 'si'){ const all = pls(); delete all[key]; LSset('vpls', all); libFilter = 'audio'; sorting = false; renderLibrary(); }
+    $('#scrim').classList.remove('on'); };
+  $('#scrim').classList.add('on');
+}
+// borrar un archivo pide confirmacion: no se puede deshacer
+function confirmRemoveItem(name){
+  $('#sheet').innerHTML = `<div><h3>¿Borrar «${esc(titleOf(name))}»?</h3>
+    <div class="meta">Se borra de este celular. Para tenerlo de nuevo hay que volver a descargarlo con internet.</div></div>
+    <div class="acts"><button class="btn sec" data-r="no">Cancelar</button><button class="btn danger" data-r="si">Borrar</button></div>`;
+  $('#sheet').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return;
+    $('#scrim').classList.remove('on'); if (b.dataset.r === 'si') removeItem(name); };
+  $('#scrim').classList.add('on');
+}
+async function removeItem(name){
+  if (current === name) closePlayer();
+  await store.remove(name); await store.remove(name + '.thumb');
+  if (thumbUrls[name]){ URL.revokeObjectURL(thumbUrls[name]); delete thumbUrls[name]; }
+  refresh();
+}
+
+// ---------- reproductor
+async function play(name){
+  const item = library.find(i => i.name === name); if (!item) return;
+  if (item.kind === 'audio'){ const sc = scopeOf(libFilter), k = queue.indexOf(name);
+    if (k < 0 || queueScope !== sc) buildQueue(name, sc); else qi = k; playErr = 0; return playAudio(name); }
+  queue = []; qi = -1;
+  if (objUrl) URL.revokeObjectURL(objUrl);
+  objUrl = URL.createObjectURL(await store.blob(name)); current = name;
+  $('#slot').innerHTML = `<video controls autoplay playsinline src="${objUrl}"></video>`;   // los videos no avanzan solos
+  $('#now').textContent = item.title; $('#pctl').hidden = true; $('#player').classList.add('on'); document.body.classList.add('playing');
+  if ('mediaSession' in navigator){ navigator.mediaSession.metadata = new MediaMetadata({title: item.title, artist: 'Offline Entertainment', artwork: thumbUrls[name] ? [{src: thumbUrls[name]}] : []});
+    navigator.mediaSession.setActionHandler('nexttrack', null); navigator.mediaSession.setActionHandler('previoustrack', null); }
+}
+async function playAudio(name){
+  const item = library.find(i => i.name === name);
+  if (!item){ queue = queue.filter(n => n !== name); if (queue.length){ qi = Math.min(qi, queue.length - 1); return playAudio(queue[qi]); } return; }
+  let url; try { url = URL.createObjectURL(await store.blob(name)); } catch { return skipBroken(); }
+  let a = $('#slot audio');   // un solo <audio>: asi sigue sonando con la pantalla bloqueada
+  if (!a){ $('#slot').innerHTML = '<audio controls playsinline></audio>'; a = $('#slot audio');
+    a.onended = () => step(1); a.onerror = () => { if (a.getAttribute('src')) skipBroken(); }; a.onplaying = () => { playErr = 0; }; }
+  a.src = url; a.play().catch(() => {});
+  if (objUrl) URL.revokeObjectURL(objUrl); objUrl = url; current = name;
+  $('#now').textContent = item.title; $('#pctl').hidden = false; ctl();
+  $('#player').classList.add('on'); document.body.classList.add('playing');
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({title: item.title, artist: 'Offline Entertainment', artwork: thumbUrls[name] ? [{src: thumbUrls[name]}] : []});
+    navigator.mediaSession.setActionHandler('nexttrack', () => step(1));
+    navigator.mediaSession.setActionHandler('previoustrack', () => step(-1));
+  }
+  if (view === 'descargas' && libFilter !== 'all' && libFilter !== 'video') renderLibrary();
+}
+function closePlayer(){ current = null; queue = []; qi = -1; $('#slot').innerHTML = ''; $('#player').classList.remove('on'); document.body.classList.remove('playing'); if (objUrl) URL.revokeObjectURL(objUrl); objUrl = null; }
+$('#close').onclick = closePlayer;
+
+// ---------- arranque y conexion
+// ---------- conexion: sin internet solo se abre "Mis descargas"
+async function ping(ms = 2500){
+  if (!navigator.onLine) return 'off';
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch('api/ping', {headers: {'X-Key': key}, cache: 'no-store', signal: c.signal});
+        return r.status === 401 ? 'key' : r.ok ? 'on' : 'off'; }
+  catch { return 'off'; } finally { clearTimeout(t); }
+}
+function setOnline(v){
+  if (v === online) return;
+  online = v;
+  $('#net').textContent = v ? 'en línea' : 'sin conexión'; $('#net').classList.toggle('off', !v);
+  $('#q').hidden = !v;
+  if (!$('#top').hidden){ if (!v && view !== 'descargas') go('descargas'); else nav(); }
+  if (v) runBatch();
+}
+async function recheck(){ const s = await ping(); if (s === 'key') return showKey(); setOnline(s === 'on'); }
+function start(){
+  $('#top').hidden = false;
+  $('#net').textContent = online ? 'en línea' : 'sin conexión'; $('#net').classList.toggle('off', !online); $('#q').hidden = !online;
+  go(online ? 'inicio' : 'descargas');
+  runBatch();
+}
+addEventListener('offline', () => setOnline(false));
+addEventListener('online', recheck);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#top').hidden) recheck(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+store.init().then(refresh).then(async () => {
+  const s = await ping();          // como mucho 2,5 s; sin red, al instante
+  if (s === 'key') return showKey();
+  online = s === 'on';
+  start();
+});
+</script>
+</body>
+</html>

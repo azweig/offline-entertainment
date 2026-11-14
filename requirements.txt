@@ -1,0 +1,3 @@
+# yt-dlp cambia seguido para seguir funcionando con YouTube: mantenlo al dia
+# (pip install -U "yt-dlp[default]"). [default] incluye el resolvedor de JavaScript (yt-dlp-ejs).
+yt-dlp[default]>=2026.10.26

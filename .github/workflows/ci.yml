@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements.txt
+      - name: Pruebas
+        run: python -m unittest discover -s tests -v
+      - name: Arranque real (401 sin clave, 200 con clave)
+        env:
+          OFFLINE_CONFIG_DIR: ${{ runner.temp }}/oe
+        run: |
+          python server.py --port 8765 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8765/ && break; sleep 0.5; done
+          KEY=$(cat "$OFFLINE_CONFIG_DIR/key")
+          test "$(stat -c %a "$OFFLINE_CONFIG_DIR/key")" = "600"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/api/ping)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "X-Key: $KEY" http://127.0.0.1:8765/api/ping)" = "200"
+          echo "ok: 401 sin clave, 200 con clave"
