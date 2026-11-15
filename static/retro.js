@@ -20,7 +20,7 @@
   // capturas: se piden con la clave a medida que aparecen en pantalla
   const shots = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting){ const i = e.target; shots.unobserve(i);
     get(i.dataset.src).then(r => r.ok ? r.blob() : null).then(b => { if (b) i.src = URL.createObjectURL(b); }).catch(() => {}); } }, {rootMargin: '300px'});
-  let on = LS('vretro2', false), sel = LS('vskin2', 'wsz:' + DEFAULT), W = LS('vwin', null), EQ = LS('veq', {on: true, pre: 50, b: Array(10).fill(50)});
+  let on = LS('vretro2', true), sel = LS('vskin2', 'wsz:' + DEFAULT), W = LS('vwin', null), EQ = LS('veq', {on: true, pre: 50, b: Array(10).fill(50)});
   let skin = null, audio = null, ctx = null, an = null, filters = null, pre = null, root, hidden = LS('vwinmin', false);
 
   // ---------- leer un .wsz (zip) en el navegador
@@ -513,7 +513,7 @@
     document.querySelector('.rskins')?.remove();
     const o = document.createElement('div'); o.className = 'rskins';
     o.innerHTML = `<div role="dialog" aria-label="Skins"><h3><span>Skins</span><button class="rx" aria-label="Cerrar">✕</button></h3>
-      <p>Los skins clásicos del Winamp Skin Museum (sin contenido +18). El que eliges se guarda en este dispositivo y sirve sin internet.</p>
+      <p>Los skins clásicos del Winamp Skin Museum (sin contenido +18). El que eliges se guarda en este dispositivo y sirve sin internet. Doble clic para elegir y cerrar.</p>
       <input type="search" placeholder="Busca por nombre: Matrix, Dragon Ball, Metallica…" enterkeyhint="search">
       <div class="rchips"><label class="rup">➕ <span>Subir .wsz</span><input type="file" accept=".wsz,.zip" hidden></label><button data-c="__mine">Mis skins</button><button data-c="" class="on">Todos</button></div>
       <div class="rerr" hidden></div><div class="rlist"><div class="rgrid"></div><button class="rmore" hidden>Ver más</button></div></div>`;
@@ -558,6 +558,11 @@
         const id = 'u' + Date.now().toString(36); await saveLocal(id, f.name.replace(/\.(wsz|zip)$/i, '').slice(0, 60), buf);
         await choose('wsz:' + id); state.cat = '__mine'; chips.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x.dataset.c === '__mine')); load(true);
       } catch (x) { showErr(x.message === 'zip' ? 'Ese archivo no parece un skin clásico (.wsz).' : x.message); }
+    });
+    // doble clic (o doble toque) en un skin: se aplica y se cierra el buscador
+    o.addEventListener('dblclick', async e => {
+      const c = e.target.closest('.card'); if (!c || e.target.closest('[data-del]')) return;
+      try { if (sel !== 'wsz:' + c.dataset.id) await choose('wsz:' + c.dataset.id, c.dataset.name); o.remove(); } catch (x) { showErr(x.message); }
     });
     o.addEventListener('click', async e => {
       if (e.target.closest('.rx') || e.target === o) return o.remove();
