@@ -98,6 +98,7 @@ No accounts. No central service. No middlemen. The server keeps nothing.
 | Twitch | Clips and past broadcasts (not live streams) |
 | Bandcamp | Single tracks |
 | Internet Archive | Video and audio |
+| Spotify | Public playlists (first 100 songs), albums, an artist's top 10 and single songs: **only the song list is read**; each song is found and saved from YouTube Music (Spotify audio is DRM-protected and never touched) |
 
 **Public content only.** Anything that needs a login, is private or is blocked in your country shows a
 clear message and is not saved. Profiles, albums and lists from these sites are not accepted: paste
@@ -313,6 +314,8 @@ Then restart the server.
   until a new version comes out. Facebook, Instagram, TikTok and X change often.
 - **YouTube usually blocks datacenter IPs** (VPS, cloud: "Sign in to confirm you're not a bot"). It is
   meant for a home connection.
+- Spotify: only public lists; its public page shows the first 100 songs of a playlist. Songs are
+  matched by title and artist on YouTube Music, so a match can occasionally be a different version.
 - Storage space depends on the phone's browser. On iPhone, install it to the home screen.
 
 ## Usage notice

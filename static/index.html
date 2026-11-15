@@ -111,7 +111,7 @@
 <div class="top" id="top" hidden>
   <div class="bar">
     <div class="logo"><img src="icon.svg" alt=""><div><b>Offline</b><small>Entertainment</small></div></div>
-    <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Facebook, TikTok…)" enterkeyhint="search" autocomplete="off">
+    <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Spotify, TikTok…)" enterkeyhint="search" autocomplete="off">
     <span class="net" id="net">en línea</span>
   </div>
   <nav id="nav"></nav>
@@ -388,6 +388,8 @@ async function forYou(){
 $('#q').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const q = $('#q').value.trim(); if (!q) return; $('#q').blur();
+  const SP = q.match(/^(?:https?:\/\/open\.spotify\.com\/(?:intl-[\w-]{2,7}\/)?(playlist|album|artist|track)\/|spotify:(playlist|album|artist|track):)([A-Za-z0-9]{22})/);
+  if (SP) return openSpotify(SP[1] || SP[2], SP[3]);
   if (/^https?:\/\//.test(q)){
     const L = ytLink(q);
     // otros sitios (Facebook, TikTok, Instagram...): el servidor dice si es compatible
@@ -464,7 +466,7 @@ async function startJob(v, mode, quality, st, save = () => {}){
     if (r.ok) return r.json();
     await store.dropParts(st.job); st.job = null; save();        // vencio en el servidor: se empieza de nuevo
   }
-  const r = await api('api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: v.id, url: v.url, mode, quality})});
+  const r = await api('api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(v.sp && !v.id && !v.url ? {song: {title: v.title, artists: v.artists || ''}, mode, quality} : {id: v.id, url: v.url, mode, quality})});
   const j = await r.json(); if (!r.ok){ const e = new Error(j.error); e.retry = j.retry; throw e; }
   st.job = j.id; save(); return j;
 }
@@ -495,9 +497,10 @@ async function downloadOne(v, mode, quality, set, st = {}, save = () => {}){
     }
   }
   st.job = null; save();
-  if (v.id) try { const t = await api('api/thumb?id=' + encodeURIComponent(v.id)); if (t.ok) await store.save(j.filename + '.thumb', t); } catch {}
+  const tid = v.id || (v.sp ? idOf(j.filename) : '');   // cancion de Spotify: la miniatura del video que se encontro
+  if (tid) try { const t = await api('api/thumb?id=' + encodeURIComponent(tid)); if (t.ok) await store.save(j.filename + '.thumb', t); } catch {}
   else if ((v.thumb || '').startsWith('data:image/')) try { await store.save(j.filename + '.thumb', await fetch(v.thumb)); } catch {}
-  await refresh();
+  await refresh(); return j;
 }
 
 // ---------- cola simple (una a la vez)
@@ -523,12 +526,45 @@ const LS = (k, d) => { try { const v = localStorage.getItem(k); return v == null
 const LSset = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 let batch = LS('vbatch', null), batchRunning = false, batchEl = null;
 const saveBatch = () => LSset('vbatch', batch && batch.items.length ? batch : null);
+// ---------- Spotify: solo la lista (titulo y artista); el audio se busca y se baja de YouTube Music
+let spmap = LS('vspmap', {});   // cancion de Spotify -> video de YouTube ya guardado
+const spSaved = x => !!spmap[x.sp] && saved(spmap[x.sp]);
+function spResolved(sp, yt){
+  if (!yt) return; spmap[sp] = yt; LSset('vspmap', spmap);
+  const all = pls(); let ch = false;
+  for (const p of Object.values(all)) for (const x of p.items) if (x.sp === sp && x.id !== yt){ x.id = yt; ch = true; }
+  if (ch) LSset('vpls', all);
+}
+function saveSpPlaylist(key, title, items){ const all = pls(); all[key] = {title, items: items.map(x => ({id: spmap[x.sp] || '', title: x.title, sp: x.sp, artists: x.artists}))}; LSset('vpls', all); }
+const spRow = (x, i) => `<div class="mrow" data-sp="${i}"><span class="mn">${i + 1}</span><div class="mt"><div class="ti">${esc(x.title)}</div>
+  <div class="ch">${esc(x.artists)}${x.duration ? ' · ' + dur(x.duration) : ''}</div></div><span class="meta">${spSaved(x) ? '✓' : '⬇'}</span></div>`;
+async function openSpotify(kind, id){
+  view = 'lista'; nav(); window.scrollTo(0, 0);
+  const main = $('#main'); main.innerHTML = '<div class="msg">Leyendo la lista de Spotify…</div>';
+  let L;
+  try { L = await getJSON(`api/spotify?kind=${kind}&id=${encodeURIComponent(id)}`); }
+  catch (e) { if (view === 'lista') main.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; return; }
+  if (view !== 'lista') return;
+  const items = L.items, title = L.title || 'Spotify', key = `sp:${kind}:${id}`, falta = items.filter(x => !spSaved(x));
+  const note = kind === 'playlist' && items.length >= 100 ? ' Spotify muestra solo las primeras 100 canciones de una playlist.'
+    : kind === 'artist' ? ' Son las 10 más escuchadas del artista.' : '';
+  main.innerHTML = `${L.cover ? `<img src="${esc(L.cover)}" alt="" style="width:140px;border-radius:8px;display:block;margin:6px 0 10px">` : ''}
+    <h2>${esc(title)}</h2>
+    <div class="meta">${esc(['Spotify', L.owner, `${items.length} ${items.length === 1 ? 'canción' : 'canciones'}`, items.length - falta.length ? `${items.length - falta.length} ya guardadas` : ''].filter(Boolean).join(' · '))}</div>
+    <div class="mbar">${falta.length ? `<button class="btn" id="dlall">⬇ Descargar todo en audio (${falta.length})</button>` : '<span class="meta">Ya tienes todo guardado.</span>'}</div>
+    <div class="meta" style="margin-bottom:6px">El audio sale de YouTube Music: cada canción se busca por su nombre y artista.${note} Toca una canción para bajar solo esa.</div>
+    <div class="mlist">${items.map(spRow).join('')}</div>`;
+  const b = $('#dlall');
+  if (b) b.onclick = () => { if (kind !== 'track') saveSpPlaylist(key, title, items); const n = addBatch(title, falta); b.disabled = true; b.textContent = n ? `En cola: ${n} canciones` : 'Ya estaban en cola'; };
+  main.querySelectorAll('[data-sp]').forEach(r => r.onclick = () => { const x = items[+r.dataset.sp]; if (spSaved(x)) return; addBatch(title, [x]); r.lastElementChild.textContent = '⏳'; });
+}
 function addBatch(title, items){
   const have = new Set(library.map(f => idOf(f.name)));
   if (!batch) batch = {title, items: [], done: 0, fail: 0};
   else if (batch.title !== title) batch.title = 'Varias listas';
-  const inq = new Set(batch.items.map(x => x.id));
-  const add = items.filter(x => !have.has(x.id) && !inq.has(x.id)).map(x => ({id: x.id, title: x.title}));
+  const kOf = x => x.id || x.sp, inq = new Set(batch.items.map(kOf));
+  const add = items.filter(x => !(x.sp ? spSaved(x) : have.has(x.id)) && !inq.has(kOf(x)))
+    .map(x => x.sp && !x.id ? {sp: x.sp, title: x.title, artists: x.artists || ''} : {id: x.id, title: x.title});
   batch.items.push(...add); saveBatch(); runBatch(); return add.length;
 }
 // pantalla encendida mientras hay descargas (si se apaga, el celular congela la app)
@@ -543,7 +579,7 @@ document.addEventListener('visibilitychange', keepAwake);
 // el servidor va preparando el siguiente mientras se guarda el actual
 async function prepNext(){
   const it = batch && batch.items[1]; if (!it || it.job) return;
-  try { await startJob({...it, url: `https://www.youtube.com/watch?v=${it.id}`}, 'audio', '480', it, saveBatch); } catch {}
+  try { await startJob({...it, url: it.id ? `https://www.youtube.com/watch?v=${it.id}` : ''}, 'audio', '480', it, saveBatch); } catch {}
 }
 async function runBatch(){
   if (batchRunning || !batch || !batch.items.length || !online) return;
@@ -558,9 +594,10 @@ async function runBatch(){
     t.textContent = `${batch.title}: ${batch.done + batch.fail + 1} de ${total}`;
     try {
       let prepped = false;
-      await downloadOne({...it, url: `https://www.youtube.com/watch?v=${it.id}`}, 'audio', '480',
+      const j = await downloadOne({...it, url: it.id ? `https://www.youtube.com/watch?v=${it.id}` : ''}, 'audio', '480',
         (txt, pct) => { c.textContent = `${it.title} — ${txt}`; if (pct != null) bar.style.width = pct + '%';
           if (!prepped && txt.startsWith('Guardando')){ prepped = true; prepNext(); } }, it, saveBatch);
+      if (it.sp && j) spResolved(it.sp, idOf(j.filename));
       batch.done++;
     } catch (e) {
       if (e.retry && batch.items.length){ c.textContent = e.retry > 60 ? `Límite por hora alcanzado: sigue sola en ${Math.round(e.retry / 60)} min…` : 'Esperando turno en el servidor…'; await sleep(e.retry * 1000); continue; }

@@ -319,5 +319,46 @@ class Resume(Auth):   # reusa el servidor de prueba de Auth
         self.assertEqual((st, body, h["Accept-Ranges"]), (200, data, "bytes"))
 
 
+EMBED = ('<html><script id="__NEXT_DATA__" type="application/json">'
+         '{"props":{"pageProps":{"state":{"data":{"entity":{"name":"Mi lista","subtitle":"Ana",'
+         '"coverArt":{"sources":[{"url":"https://evil.example/x.jpg"}]},"trackList":['
+         '{"uri":"spotify:track:3h5T5JypYU7huFiVYhv1dr","title":"BbY WOW","subtitle":"KAROL G,\\u00a0Judeline","duration":225834},'
+         '{"uri":"spotify:track:<script>","title":"mala","subtitle":"x","duration":1}]}}}}}}</script></html>')
+
+
+class Spotify(unittest.TestCase):
+    def test_enlaces(self):
+        for raw, want in [("https://open.spotify.com/playlist/37i9dQZF1DX4UtSsGT1Sbe?si=1", ("playlist", "37i9dQZF1DX4UtSsGT1Sbe")),
+                          ("https://open.spotify.com/intl-es/album/4aawyAB9vmqN3uQ7FjRGTy", ("album", "4aawyAB9vmqN3uQ7FjRGTy")),
+                          ("spotify:track:3h5T5JypYU7huFiVYhv1dr", ("track", "3h5T5JypYU7huFiVYhv1dr"))]:
+            m = server.SP_LINK.fullmatch(raw)
+            self.assertEqual((m.group(1) or m.group(2), m.group(3)), want)
+        for raw in ("https://open.spotify.com.evil.com/playlist/37i9dQZF1DX4UtSsGT1Sbe",
+                    "https://open.spotify.com/user/37i9dQZF1DX4UtSsGT1Sbe", "https://open.spotify.com/playlist/corto"):
+            self.assertIsNone(server.SP_LINK.fullmatch(raw), raw)
+
+    def test_lee_solo_titulos_validos_y_tapa_de_spotify(self):
+        class R:
+            def __init__(self, b): self.b = b
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n): return self.b
+        with mock.patch.object(server, "check_url", lambda u: u), \
+             mock.patch.object(server.OPENER, "open", lambda *a, **k: R(EMBED.encode())), \
+             mock.patch.object(server, "fetch_image") as fi:
+            d = server.spotify_list("playlist", "37i9dQZF1DX4UtSsGT1Sbe")
+        self.assertEqual(d["items"], [{"sp": "3h5T5JypYU7huFiVYhv1dr", "title": "BbY WOW",
+                                       "artists": "KAROL G, Judeline", "duration": 226}])
+        fi.assert_not_called()   # la portada solo se pide si viene de i.scdn.co
+        self.assertIsNone(d["cover"])
+
+    def test_elige_la_cancion_por_titulo(self):
+        es = {"entries": [{"id": "aaaaaaaaaaa", "title": "Otra cosa"}, {"id": "bbbbbbbbbbb", "title": "Take on Me (2017)"}]}
+        ydl = mock.MagicMock()
+        ydl.__enter__.return_value.extract_info.return_value = es
+        with mock.patch.object(server, "check_url", lambda u: u), mock.patch.object(server.yt_dlp, "YoutubeDL", return_value=ydl):
+            self.assertEqual(server.find_song("Take On Me", "a-ha"), "bbbbbbbbbbb")
+
+
 if __name__ == "__main__":
     unittest.main()

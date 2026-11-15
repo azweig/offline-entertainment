@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-15
+
+### Added
+- Spotify: paste a public playlist, album, artist or song link to see its songs and save them all
+  (or one) as audio. Only the song list is read, from Spotify's public embed page (no account, no key);
+  each song is found and saved from YouTube Music. Saved lists appear as playlists in *My downloads*,
+  with "download the missing ones". `GET /api/spotify` and `{"song": {...}}` jobs.
+
 ### Fixed
 - Thumbnails of links from other sites (Facebook, TikTok, SoundCloud…) were not saved with the media:
   the CSP blocked reading the `data:` image. `connect-src` now allows `data:`.
@@ -48,7 +56,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azweig/offline-entertainment/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azweig/offline-entertainment/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/azweig/offline-entertainment/releases/tag/v0.1.0

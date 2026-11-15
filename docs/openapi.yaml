@@ -155,6 +155,41 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "502": { $ref: "#/components/responses/Upstream" }
 
+  /api/spotify:
+    get:
+      tags: [links]
+      summary: Song list of a public Spotify playlist, album, artist or track (titles and artists only)
+      parameters:
+        - { name: kind, in: query, required: true, schema: { type: string, enum: [playlist, album, artist, track] } }
+        - { name: id, in: query, required: true, schema: { type: string, pattern: "^[A-Za-z0-9]{22}$" } }
+      responses:
+        "200":
+          description: The list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string }
+                  id: { type: string }
+                  title: { type: string }
+                  owner: { type: string }
+                  cover: { type: [string, "null"], description: "data: URI of the playlist cover" }
+                  items:
+                    type: array
+                    maxItems: 200
+                    items:
+                      type: object
+                      properties:
+                        sp: { type: string, description: Spotify track id }
+                        title: { type: string }
+                        artists: { type: string }
+                        duration: { type: [integer, "null"] }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
   /api/link:
     get:
       tags: [links]
@@ -204,10 +239,16 @@ paths:
           application/json:
             schema:
               type: object
-              description: Body must be smaller than 5000 bytes. Provide `id` or `url`.
+              description: Body must be smaller than 5000 bytes. Provide `id`, `url` or `song`.
               properties:
                 id: { type: string, description: YouTube ID or link }
                 url: { type: string, description: Link from a supported site }
+                song:
+                  type: object
+                  description: A song from a Spotify list, found on YouTube Music by the server
+                  properties:
+                    title: { type: string, minLength: 1, maxLength: 200 }
+                    artists: { type: string, maxLength: 200 }
                 mode: { type: string, enum: [audio, video], default: video }
                 quality: { type: string, enum: ["360", "480", "720"], default: "480" }
       responses:

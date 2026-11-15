@@ -293,10 +293,13 @@ def single(info: dict) -> dict:
     return info
 
 
-def run(job_id: str, url: str, mode: str, quality: str, ies: list[str] | None = None) -> None:
+def run(job_id: str, url: str, mode: str, quality: str, ies: list[str] | None = None,
+        song: tuple[str, str] | None = None) -> None:
     global ACTIVE
     try:
         (TMP_ROOT / job_id).mkdir(parents=True)
+        if song:   # cancion de una lista de Spotify: se busca en YouTube Music (el audio sale de YouTube)
+            url = f"https://www.youtube.com/watch?v={find_song(*song)}"
         with yt_dlp.YoutubeDL(options(job_id, mode, quality, ies)) as ydl:
             info = single(ydl.extract_info(check_url(url), download=False))
             info["title"] = clean_title(info.get("title")) or info.get("id")
@@ -386,6 +389,69 @@ def item(e: dict) -> dict | None:
 
 
 LIST_ID = re.compile(r"[\w-]{12,80}")
+SP_LINK = re.compile(r"(?:https?://open\.spotify\.com/(?:intl-[\w-]{2,7}/)?(playlist|album|artist|track)/|spotify:(playlist|album|artist|track):)"
+                     r"([A-Za-z0-9]{22})(?:[?#/].*)?")
+SP_ID = re.compile(r"[A-Za-z0-9]{22}")
+SP_KINDS = ("playlist", "album", "artist", "track")
+
+
+def spotify_list(kind: str, sid: str) -> dict:
+    """Canciones de una playlist/album/artista PUBLICO de Spotify, leidas de su pagina para incrustar
+    (la misma que usa cualquier blog; sin cuenta ni clave). Solo titulos y artistas: el audio de Spotify
+    tiene DRM y no se toca. Spotify muestra ahi hasta 100 canciones de una playlist y 10 de un artista."""
+    with OPENER.open(check_url(f"https://open.spotify.com/embed/{kind}/{sid}"), timeout=10) as r:
+        html = r.read(4_000_000).decode("utf-8", "replace")
+    m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', html, re.S)
+    if not m:
+        raise RuntimeError("Spotify no mostro esa lista (puede ser privada o no existir)")
+    e = json.loads(m.group(1))["props"]["pageProps"]["state"]["data"]["entity"]
+    clean = lambda t: re.sub(r"\s+", " ", str(t or "").replace("\xa0", " ")).strip()[:200]   # noqa: E731
+    if kind == "track":
+        rows = [{"uri": e.get("uri"), "title": e.get("name") or e.get("title"),
+                 "subtitle": ", ".join(a.get("name", "") for a in e.get("artists") or []), "duration": e.get("duration")}]
+    else:
+        rows = e.get("trackList") or []
+    items = []
+    for t in rows:
+        tid = str(t.get("uri") or "").rsplit(":", 1)[-1]
+        if not SP_ID.fullmatch(tid) or not t.get("title"):
+            continue
+        items.append({"sp": tid, "title": clean(t.get("title")), "artists": clean(t.get("subtitle")),
+                      "duration": round(t["duration"] / 1000) if isinstance(t.get("duration"), (int, float)) else None})
+    srcs = [x.get("url") for x in ((e.get("coverArt") or {}).get("sources") or [])
+            if str(x.get("url") or "").startswith("https://i.scdn.co/")]
+    return {"kind": kind, "id": sid, "title": clean(e.get("name") or e.get("title")),
+            "owner": items[0]["artists"] if kind == "track" and items else clean(e.get("subtitle")), "items": items[:MAX_LIST],
+            "cover": fetch_image(srcs[0]) if srcs else None}
+
+
+def norm(t: str) -> str:
+    t = re.sub(r"\(.*?\)|\[.*?\]| - .*$|feat\..*$|ft\..*$", "", (t or "").lower())
+    return re.sub(r"[^\w]+", " ", t).strip()
+
+
+def find_song(title: str, artists: str) -> str:
+    """ID de YouTube de la cancion: primero en YouTube Music (canciones oficiales, sin intros de video)."""
+    q = f"{title} {artists}".strip()[:200]
+    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True,
+         "allowed_extractors": YT_IES, "cachedir": False, "playlistend": 5}
+    check_url("https://music.youtube.com/")
+    for url in ("https://music.youtube.com/search?q=" + quote(q) + "#songs",
+                "ytsearch5:" + q + " audio"):
+        try:
+            with yt_dlp.YoutubeDL(o) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except Exception:  # noqa: BLE001, S112  YouTube Music no respondio: se prueba la busqueda normal
+            continue
+        es = [x for x in (info or {}).get("entries") or [] if x and YT_ID.fullmatch(x.get("id") or "")]
+        if es:
+            want = norm(title)
+            best = next((x for x in es if norm(x.get("title")) == want), None) or \
+                next((x for x in es if want and want in norm(x.get("title"))), None) or es[0]
+            return best["id"]
+    raise RuntimeError("No encontre esa cancion en YouTube")
+
+
 HANDLE = re.compile(r"@[\w.\-]{3,40}")
 DEAD = re.compile(r"^\[(Deleted|Private) video\]$|^\[(Video eliminado|Video privado)\]$", re.I)
 
@@ -652,6 +718,22 @@ class H(BaseHTTPRequestHandler):
                 return self.js({"error": friendly(exc)}, 502)
             put_cache("/api/link:" + s[2], val)
             return self.js(val)
+        if path == "/api/spotify":
+            kind, sid = (qs.get("kind") or [""])[0], (qs.get("id") or [""])[0]
+            if kind not in SP_KINDS or not SP_ID.fullmatch(sid):
+                return self.js({"error": "Enlace de Spotify no valido"}, 400)
+            hit = cached(f"/api/spotify:{kind}:{sid}")
+            if hit is not None:
+                return self.js(hit)
+            try:
+                val = spotify_list(kind, sid)
+            except Exception as exc:  # noqa: BLE001
+                return self.js({"error": friendly(exc) if isinstance(exc, RuntimeError) else
+                                "No se pudo leer esa lista de Spotify (debe ser publica)."}, 502)
+            if not val["items"]:
+                return self.js({"error": "Esa lista de Spotify esta vacia o es privada."}, 404)
+            put_cache(f"/api/spotify:{kind}:{sid}", val)
+            return self.js(val)
         if path == "/api/thumb":
             vid = (qs.get("id") or [""])[0]
             if not re.fullmatch(r"[\w-]{11}", vid):
@@ -734,8 +816,12 @@ class H(BaseHTTPRequestHandler):
         if not isinstance(d, dict):
             return self.js({"error": "pedido invalido"}, 400)
         raw = str(d.get("id") or d.get("url") or "")
-        vid, ies = youtube_id(raw), None
-        if vid:
+        vid, ies, song = youtube_id(raw), None, None
+        sg = d.get("song")
+        if not raw and isinstance(sg, dict) and isinstance(sg.get("title"), str) and 0 < len(sg["title"].strip()) <= 200:
+            song = (sg["title"].strip(), str(sg.get("artists") or "").strip()[:200])
+            url = ""   # se resuelve en el hilo de la descarga (find_song)
+        elif vid:
             # YouTube: nunca se usa el enlace que manda el usuario; se arma uno desde el ID
             url = f"https://www.youtube.com/watch?v={vid}"
         elif s := site_link(raw):
@@ -753,7 +839,7 @@ class H(BaseHTTPRequestHandler):
             job_id = uuid.uuid4().hex[:16]
             JOBS[job_id] = {"id": job_id, "status": "en cola", "progress": 0,
                             "mode": mode, "created": time.time()}
-        threading.Thread(target=run, args=(job_id, url, mode, str(d.get("quality", "480")), ies),
+        threading.Thread(target=run, args=(job_id, url, mode, str(d.get("quality", "480")), ies, song),
                          daemon=True).start()
         self.js(public(JOBS[job_id]), 201)
 

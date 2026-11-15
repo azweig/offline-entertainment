@@ -25,6 +25,7 @@ A machine-readable version is in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1); y
 | GET | `/api/playlist` | Every item of a playlist (max 200) |
 | GET | `/api/artist` | Every video of a channel or @handle (max 200) |
 | GET | `/api/link` | Details of a link from another supported site |
+| GET | `/api/spotify` | Song list of a public Spotify playlist, album, artist or track |
 | GET | `/api/thumb` | A YouTube thumbnail, fetched through the server |
 | POST | `/api/jobs` | Start preparing a file |
 | GET | `/api/jobs/{id}` | Job progress |
@@ -91,6 +92,15 @@ Static, unauthenticated: `/`, `/index.html`, `/sw.js`, `/manifest.webmanifest`, 
 `playlist`: list ID, 12–80 chars of `[A-Za-z0-9_-]`. `artist`: channel ID (`UC…`) or `@handle`
 (3–40 chars). `200 {"kind", "id", "title", "owner", "items": [Video]}` (max 200, deleted/private
 entries removed) · `502` if it can't be read.
+
+### `GET /api/spotify?kind=&id=`
+`kind`: `playlist` · `album` · `artist` · `track`; `id`: the 22-character Spotify id. Reads Spotify's public
+embed page (no account, no key). Only titles and artists are returned; no audio comes from Spotify.
+`200 {"kind", "id", "title", "owner", "cover": "data:image/…"|null, "items": [{"sp", "title", "artists", "duration"}]}`
+(max 100 for playlists, 10 for artists) · `400` bad kind/id · `404` empty or private · `502` Spotify did not answer. Cached 6 h.
+
+To save a song from the list, start a job with `{"song": {"title", "artists"}, "mode": "audio"}` instead of
+`id`/`url`: the job finds the song on YouTube Music (then YouTube search) and saves that video's audio.
 
 ### `GET /api/link?url=`
 `url`: a link from a [supported site](../README.md#supported-sites), max 500 chars.

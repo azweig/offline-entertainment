@@ -101,6 +101,7 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
 | Twitch | Clips y transmisiones pasadas (no en vivo) |
 | Bandcamp | Canciones sueltas |
 | Internet Archive | Videos y audios |
+| Spotify | Playlists públicas (primeras 100 canciones), álbumes, el top 10 de un artista y canciones sueltas: **solo se lee la lista**; cada canción se busca y se guarda desde YouTube Music (el audio de Spotify tiene DRM y no se toca) |
 
 **Solo contenido público.** Lo que pide iniciar sesión, es privado o está bloqueado en tu país muestra
 un aviso claro y no se guarda. Los perfiles, álbumes y listas de estos sitios no se aceptan: pega el
