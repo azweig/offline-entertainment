@@ -312,7 +312,7 @@ function showKey(msg){
     <input type="password" id="key" placeholder="Clave privada" autocomplete="current-password" required>
     <button class="btn">Entrar</button><div class="ch" style="color:var(--err)">${esc(msg || '')}</div></form>`;
   $('#kf').onsubmit = async e => { e.preventDefault(); key = $('#key').value.trim();
-    try { if ((await api('api/ping')).ok){ localStorage.setItem('vk', key); online = true; start(); } } catch {} };
+    try { if ((await api('api/ping')).ok){ localStorage.setItem('vk', key); online = true; start(); pendingInv(); } } catch {} };
 }
 
 // ---------- vistas
@@ -410,6 +410,7 @@ $('#q').addEventListener('keydown', e => {
   const q = $('#q').value.trim(); if (!q) return; $('#q').blur();
   const SP = q.match(/^(?:https?:\/\/open\.spotify\.com\/(?:intl-[\w-]{2,7}\/)?(playlist|album|artist|track)\/|spotify:(playlist|album|artist|track):)([A-Za-z0-9]{22})/);
   if (SP) return openSpotify(SP[1] || SP[2], SP[3]);
+  if (q.includes('#inv=')){ $('#q').value = ''; takeInv(q.slice(q.indexOf('#inv='))); return; }
   if (/^https?:\/\//.test(q)){
     const L = ytLink(q);
     // otros sitios (Facebook, TikTok, Instagram...): el servidor dice si es compatible
@@ -578,6 +579,74 @@ async function openSpotify(kind, id){
   if (b) b.onclick = () => { if (kind !== 'track') saveSpPlaylist(key, title, items); const n = addBatch(title, falta); b.disabled = true; b.textContent = n ? `En cola: ${n} canciones` : 'Ya estaban en cola'; };
   main.querySelectorAll('[data-sp]').forEach(r => r.onclick = () => { const x = items[+r.dataset.sp]; if (spSaved(x)) return; addBatch(title, [x]); r.lastElementChild.textContent = '⏳'; });
 }
+const b64url = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+// ---------- invitaciones con musica: la lista viaja dentro del #fragmento del enlace
+// (el navegador no lo manda a ningun servidor) y quien la abre la guarda como playlist y la baja.
+const invHashOf = s => { let h = 5381; for (const c of s) h = (h * 33 ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+function invItems(P){
+  const src = P ? P.items : music('audio').map(i => ({id: idOf(i.name), title: i.title}));
+  return src.map(x => /^[\w-]{11}$/.test(x.id || '') ? {i: x.id, t: String(x.title || '').slice(0, 100)}
+    : /^[A-Za-z0-9]{22}$/.test(x.sp || '') ? {s: x.sp, t: String(x.title || '').slice(0, 100), a: String(x.artists || '').slice(0, 80)} : null).filter(Boolean).slice(0, 300);
+}
+function invite(P){
+  const items = invItems(P); if (!items.length) return;
+  $('#sheet').innerHTML = `<h3>💌 Invitar con esta música</h3>
+    <div class="meta">${items.length === 1 ? 'Arma un enlace con 1 canción. Quien lo abra podrá bajarla para escucharla sin conexión.' : `Arma un enlace con ${items.length} canciones. Quien lo abra podrá bajarlas para escucharlas sin conexión.`}</div>
+    <label class="meta" style="display:block;margin-top:10px">Tu nombre</label><input id="ivf" maxlength="40" class="search" style="width:100%;margin:4px 0" value="${esc(LS('vinvname', ''))}">
+    <label class="meta" style="display:block">Nombre de la lista</label><input id="ivn" maxlength="60" class="search" style="width:100%;margin:4px 0" value="${esc(P ? P.title : t('Mi música'))}">
+    <label class="meta" style="display:block">Mensaje</label><textarea id="ivm" maxlength="300" rows="3" class="search" style="width:100%;margin:4px 0;border-radius:12px;resize:vertical;color:var(--text);font:inherit;line-height:1.4;box-sizing:border-box">${esc(t('Te comparto esta música para que la escuches mientras viajas 🎶'))}</textarea>
+    <button class="btn" data-r="ok">💌 Crear invitación</button><button class="btn sec" data-r="no">Cancelar</button>`;
+  $('#scrim').classList.add('on');
+  $('#sheet').onclick = async e => {
+    const b = e.target.closest('[data-r]'); if (!b) return;
+    if (b.dataset.r === 'no') return $('#scrim').classList.remove('on');
+    if (b.dataset.r === 'ok'){
+      const f = $('#ivf').value.trim().slice(0, 40), n = $('#ivn').value.trim().slice(0, 60) || t('Mi música'), m = $('#ivm').value.trim().slice(0, 300);
+      LSset('vinvname', f);
+      const url = new URL('.', location.href).href + '#inv=' + b64url(JSON.stringify({v: 1, f, n, m, s: items}));
+      $('#sheet').dataset.url = url; $('#sheet').dataset.n = n; $('#sheet').dataset.m = m;
+      $('#sheet').innerHTML = `<h3>💌 Invitación lista</h3><div class="meta">${items.length} ${items.length === 1 ? 'canción' : 'canciones'} · «<span data-noi18n>${esc(n)}</span>»</div>
+        <div class="meta" style="margin:8px 0">Mándala por WhatsApp, correo o donde quieras. La lista va dentro del enlace: no se guarda en ningún servidor. Quien use otra instalación puede pegar el enlace en su buscador.</div>
+        ${navigator.share ? '<button class="btn" data-r="share">📤 Compartir</button>' : ''}<button class="btn ${navigator.share ? 'sec' : ''}" data-r="copy">📋 Copiar enlace</button><button class="btn sec" data-r="no">Cerrar</button>`;
+    }
+    const url = $('#sheet').dataset.url;
+    if (b.dataset.r === 'share') try { await navigator.share({title: $('#sheet').dataset.n, text: $('#sheet').dataset.m, url}); } catch {}
+    if (b.dataset.r === 'copy') try { await navigator.clipboard.writeText(url); b.textContent = '✓ Copiado'; } catch { prompt('Copia este enlace:', url); }
+  };
+}
+function takeInv(hash){
+  const m = String(hash).match(/#inv=([\w-]+)/); if (!m) return false;
+  let d;
+  try { d = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/'))))); } catch { alert('Esa invitación no se pudo leer. Pide que te la vuelvan a mandar.'); return false; }
+  const items = (Array.isArray(d.s) ? d.s : []).slice(0, 300).map(x => /^[\w-]{11}$/.test(x.i || '') ? {id: x.i, title: String(x.t || '').slice(0, 100) || 'Canción'}
+    : /^[A-Za-z0-9]{22}$/.test(x.s || '') ? {sp: x.s, title: String(x.t || '').slice(0, 100) || 'Canción', artists: String(x.a || '').slice(0, 80)} : null).filter(Boolean);
+  if (!items.length) return false;
+  const from = String(d.f || '').slice(0, 40), name = String(d.n || '').slice(0, 60) || 'Música', msg = String(d.m || '').slice(0, 300);
+  // queda como playlist en Mis descargas (la misma invitacion abierta dos veces no se duplica)
+  const key = 'inv:' + invHashOf(m[1]), all = pls();
+  all[key] = {title: name, items: items.map(x => x.id ? {id: x.id, title: x.title} : {id: spmap[x.sp] || '', title: x.title, sp: x.sp, artists: x.artists})};
+  LSset('vpls', all);
+  const isSaved = x => x.id ? saved(x.id) : spSaved(x), missing = items.filter(x => !isSaved(x)), have = items.length - missing.length;
+  $('#sheet').innerHTML = `<h3>💌 ${from ? `<span data-noi18n>${esc(from)}</span> te invita a escuchar` : 'Te invitan a escuchar'}</h3>
+    <div style="font-size:18px;font-weight:700;margin:2px 0 6px" data-noi18n>«${esc(name)}»</div>
+    ${msg ? `<div class="meta" style="white-space:pre-wrap;margin-bottom:8px" data-noi18n>${esc(msg)}</div>` : ''}
+    <div class="meta">${items.length} ${items.length === 1 ? 'canción' : 'canciones'}</div>
+    <p style="margin:10px 0">${!have ? 'Descarga todo esto para que lo puedas escuchar mientras viajas.'
+      : missing.length ? `Ya tienes ${have} de estas canciones. Agregué la lista a tus playlists.` : 'Ya tienes todas estas canciones. La lista quedó en Mis descargas.'}</p>
+    ${missing.length ? `<button class="btn" data-r="dl">⬇ ${have ? `Bajar las que faltan (${missing.length})` : `Descargar todo (${missing.length})`}</button>` : ''}
+    <button class="btn sec" data-r="ver">Ver la lista</button><button class="btn sec" data-r="no">Ahora no</button>`;
+  $('#scrim').classList.add('on');
+  $('#sheet').onclick = e => {
+    const b = e.target.closest('[data-r]'); if (!b) return;
+    if (b.dataset.r === 'dl'){
+      if (!online){ b.textContent = 'Necesitas internet para descargar. La lista ya quedó guardada.'; return; }
+      const n = addBatch(name, missing); b.disabled = true; b.textContent = n ? `En cola: ${n} canciones` : 'Ya estaban en cola';
+      setTimeout(() => $('#scrim').classList.remove('on'), 1200); return; }
+    $('#scrim').classList.remove('on');
+    if (b.dataset.r === 'ver'){ libFilter = 'pl:' + key; go('descargas'); }
+  };
+  return true;
+}
 function addBatch(title, items){
   const have = new Set(library.map(f => idOf(f.name)));
   if (!batch) batch = {title, items: [], done: 0, fail: 0};
@@ -724,6 +793,7 @@ async function renderLibrary(){
       <button class="tg ${shuffle ? 'on' : ''}" id="mshuf">🔀 Aleatorio</button><button class="tg ${repeat ? 'on' : ''}" id="mrep">🔁 Repetir</button><button class="tg ${window.Retro?.on ? 'on' : ''}" data-retro>📼 Escucha como en los 90</button>` : ''}
       ${asList ? (mus.length > 1 ? `<button class="tg ${sorting ? 'on' : ''}" id="msort">↕ ${sorting ? 'Listo' : 'Cambiar orden'}</button>` : '') : `<button class="tg" id="mlist">Ver lista de canciones</button>`}
       ${P && falta.length && online ? `<button class="tg" id="mfalta">⬇ Bajar las que faltan (${falta.length})</button>` : ''}
+      ${(P ? P.items.length : mus.length) ? `<button class="tg" id="minv">💌 Invitar con esta música</button>` : ''}
       ${P ? `<button class="tg" id="mquitar">Quitar playlist</button>` : ''}</div>` : '';
   const body = asList
     ? (mus.length ? `<div class="mlist">${mus.map((i, k) => `<div class="mrow ${i.name === current ? 'now' : ''}" ${sorting ? '' : `data-play="${esc(i.name)}"`}>
@@ -747,6 +817,7 @@ async function renderLibrary(){
   if ($('#msort')) $('#msort').onclick = () => { sorting = !sorting; renderLibrary(); };
   if ($('#mfalta')) $('#mfalta').onclick = () => { const n = addBatch(P.title, falta); $('#mfalta').textContent = n ? `En cola: ${n}` : 'Ya estaban en cola'; };
   if ($('#mquitar')) $('#mquitar').onclick = () => confirmRemovePl(libFilter.slice(3), P.title);
+  if ($('#minv')) $('#minv').onclick = () => invite(P);
   if ($('#mlist')) $('#mlist').onclick = () => { libFilter = 'audio'; renderLibrary(); };
   window.scrollTo(0, y);
 }
@@ -847,11 +918,16 @@ if ('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!had || reloaded || busy || batchRunning || current) return; reloaded = true; location.reload(); });
 }
+// invitacion con musica en el enlace: se saca de la barra y, si hace falta la clave, espera a que entres
+if (location.hash.includes('#inv=')){ try { sessionStorage.setItem('vinv', location.hash); } catch {} history.replaceState(null, '', location.pathname + location.search); }
+const pendingInv = () => { let h = ''; try { h = sessionStorage.getItem('vinv') || ''; sessionStorage.removeItem('vinv'); } catch {} if (h) takeInv(h); };
+addEventListener('hashchange', () => { if (location.hash.includes('#inv=')){ const h = location.hash; history.replaceState(null, '', location.pathname + location.search); takeInv(h); } });
 store.init().then(refresh).then(async () => {
   const s = await ping();          // como mucho 2,5 s; sin red, al instante
   if (s === 'key') return showKey();
   online = s === 'on';
   start();
+  pendingInv();
 });
 </script>
 </body>

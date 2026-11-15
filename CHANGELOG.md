@@ -6,10 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-15
+
+### Added
+- 💌 Invitations with music: a link (`#inv=` fragment, never sent to a server) carrying a playlist,
+  the sender's name and a message. Opening it saves the playlist and offers "download all" or
+  "download the missing ones". If the server asks for the key first, the invitation opens right after
+  logging in; the link can also be pasted into the search box.
+- The 90s player list refreshes by itself when songs finish downloading or are deleted.
+
 ### Changed
 - The 90s player opens by default on computers (until you close it with ✕); on phones it starts as a big
   "📼 Listen to music" button so it doesn't cover half the screen. The button appears whenever the player is hidden.
 - Double-click a skin in the browser to pick it and close the browser.
+
+### Fixed
+- Safari: when IndexedDB refuses to store a `Blob` (e.g. private browsing), the bytes are stored
+  instead, so skins and downloads work.
+- The 90s player windows re-stack when the screen scale changes, and stay below the app's sheets and
+  dialogs.
+- The invitation message box uses the app's text color and font.
+- The CSP hash is computed when `index.html` is served, so updating the page without restarting the
+  server no longer blocks the app's script.
 
 ## [1.5.0] - 2026-11-15
 
@@ -105,7 +123,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/azweig/offline-entertainment/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/azweig/offline-entertainment/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...v1.3.0

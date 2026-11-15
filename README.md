@@ -84,6 +84,10 @@ No accounts. No central service. No middlemen. The server keeps nothing.
   lock-screen controls. Broken songs are skipped.
 - Your own playlists, a filter by playlist, and "download the missing ones".
 - Deleting anything asks for confirmation first.
+- **💌 Invite with music:** share a playlist (or all your music) as a link with your name and a message.
+  Whoever opens it gets the list as a playlist and one button to download it all (or only the songs
+  they are missing) to listen while traveling. The list travels inside the link's `#fragment`, so no
+  server stores it; it can also be pasted into the search box of any installation.
 - **Listen like it's the 90s (📼):** a floating player in the classic desktop-player shape — main
   window, 10-band equalizer and playlist — that you can drag, dock, shade and minimize while you keep
   browsing; the music never stops. It draws **classic Winamp 2 skins (.wsz)**: upload your own, or run

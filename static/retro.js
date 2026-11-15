@@ -83,7 +83,7 @@
 
   // ---------- estilos
   const css = `
-  #wa{position:fixed;inset:0;pointer-events:none;z-index:40}
+  #wa{position:fixed;inset:0;pointer-events:none;z-index:19}   /* debajo de los paneles de la app (z 20) */
   #wa .win{position:absolute;pointer-events:auto;transform-origin:0 0;image-rendering:pixelated;user-select:none;-webkit-user-select:none;
     touch-action:none;background-repeat:no-repeat;box-shadow:0 4px 18px #0009;font:8px/1 ui-monospace,monospace;overflow:hidden}
   #wa .win>*{position:absolute;background-repeat:no-repeat;box-sizing:border-box}
@@ -96,7 +96,7 @@
   #wa .plrows div b{font-weight:400;flex:1;overflow:hidden;text-overflow:ellipsis}
   #wa .plrows div span{flex:none}
   #wa .rht{cursor:pointer}
-  #wa-min{position:fixed;z-index:41;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));height:54px;padding:0 20px 0 16px;border-radius:27px;border:0;
+  #wa-min{position:fixed;z-index:18;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));height:54px;padding:0 20px 0 16px;border-radius:27px;border:0;
     background:#f2a33a;color:#111;font:700 17px system-ui,sans-serif;box-shadow:0 6px 20px #000a;display:none;align-items:center;gap:8px;cursor:pointer}
   #wa-min b{font-size:26px;line-height:1}
   body.wa-pill #wa-min{display:flex}

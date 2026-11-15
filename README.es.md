@@ -87,6 +87,10 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   propio orden y controles en la pantalla bloqueada. Salta las canciones dañadas.
 - Tus propias playlists, filtro por playlist y "bajar las que faltan".
 - Borrar cualquier cosa siempre pide confirmación.
+- **💌 Invitar con música:** comparte una playlist (o toda tu música) como un enlace con tu nombre y un
+  mensaje. Quien lo abre recibe la lista como playlist y un botón para bajar todo (o solo lo que le
+  falta) y escucharlo mientras viaja. La lista va dentro del `#fragmento` del enlace, así que ningún
+  servidor la guarda; también se puede pegar en el buscador de cualquier instalación.
 - **Escucha como en los 90 (📼):** un reproductor flotante con la forma de los clásicos de escritorio
   (ventana principal, ecualizador de 10 bandas y lista) que se arrastra, se pega, se achica y se
   minimiza mientras sigues navegando; la música nunca se corta. Se dibuja con **skins clásicos de
