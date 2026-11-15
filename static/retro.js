@@ -21,7 +21,7 @@
   const shots = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting){ const i = e.target; shots.unobserve(i);
     get(i.dataset.src).then(r => r.ok ? r.blob() : null).then(b => { if (b) i.src = URL.createObjectURL(b); }).catch(() => {}); } }, {rootMargin: '300px'});
   let on = LS('vretro2', true), sel = LS('vskin2', 'wsz:' + DEFAULT), W = LS('vwin', null), EQ = LS('veq', {on: true, pre: 50, b: Array(10).fill(50)});
-  let skin = null, audio = null, ctx = null, an = null, filters = null, pre = null, root, hidden = LS('vwinmin', false);
+  let skin = null, audio = null, ctx = null, an = null, filters = null, pre = null, root, hidden = LS('vwinmin', !fine);
 
   // ---------- leer un .wsz (zip) en el navegador
   const NEED = ['main.bmp', 'titlebar.bmp', 'cbuttons.bmp', 'numbers.bmp', 'nums_ex.bmp', 'playpaus.bmp', 'monoster.bmp', 'posbar.bmp',
@@ -96,9 +96,11 @@
   #wa .plrows div b{font-weight:400;flex:1;overflow:hidden;text-overflow:ellipsis}
   #wa .plrows div span{flex:none}
   #wa .rht{cursor:pointer}
-  #wa-min{position:fixed;z-index:41;right:14px;bottom:84px;width:46px;height:46px;border-radius:50%;border:1px solid #555;background:#1b1f27;color:#fff;font-size:22px;
-    box-shadow:0 4px 14px #0009;display:none;cursor:pointer}
-  body.retro.wa-hide #wa-min{display:block}
+  #wa-min{position:fixed;z-index:41;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));height:54px;padding:0 20px 0 16px;border-radius:27px;border:0;
+    background:#f2a33a;color:#111;font:700 17px system-ui,sans-serif;box-shadow:0 6px 20px #000a;display:none;align-items:center;gap:8px;cursor:pointer}
+  #wa-min b{font-size:26px;line-height:1}
+  body.wa-pill #wa-min{display:flex}
+  body.playing.wa-pill #wa-min{bottom:calc(150px + env(safe-area-inset-bottom))}
   body.retro:not(.wa-hide) #player.raud{display:none!important}
   .rskins{position:fixed;inset:0;z-index:60;background:#000c;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:10px}
   .rskins>div{box-sizing:border-box;min-width:0;background:#14181f;border:1px solid #333;border-radius:10px;padding:14px;max-width:900px;width:100%;height:min(92vh,900px);display:flex;flex-direction:column;color:#ddd;font:14px system-ui,sans-serif}
@@ -199,9 +201,6 @@
       <div data-k="plist" class="rht" role="button" aria-label="Ver lista de canciones" style="left:231px;width:22px;height:18px"></div>
       <div data-k="pres" class="rht" style="left:255px;width:20px;height:20px;cursor:ns-resize"></div>`;
     root.append(main, eq, pl); wins = {main, eq, pl};
-    minBtn = document.createElement('button'); minBtn.id = 'wa-min'; minBtn.textContent = '📼'; minBtn.setAttribute('aria-label', 'Abrir el reproductor de los 90');
-    minBtn.onclick = () => { hidden = false; LSset('vwinmin', false); apply(); };
-    document.body.append(minBtn);
     for (const w of Object.values(wins)) wire_(w);
     addEventListener('resize', () => { clampAll(); place(); });
   }
@@ -375,9 +374,17 @@
       w.style.width = '275px'; w.style.height = H(k) / s + 'px';
     }
   }
+  function pill(){   // boton grande "Escuchar musica": siempre que el reproductor no este a la vista
+    if (minBtn) return;
+    minBtn = document.createElement('button'); minBtn.id = 'wa-min'; minBtn.innerHTML = '<b>📼</b><span>Escuchar música</span>';
+    minBtn.onclick = () => { if (!on) set(true); else { hidden = false; LSset('vwinmin', false); apply(); } };
+    document.body.append(minBtn);
+  }
   function apply(){
+    pill();
     document.body.classList.toggle('retro', on);
     document.body.classList.toggle('wa-hide', on && hidden);
+    document.body.classList.toggle('wa-pill', !on || hidden);
     if (on) build();
     if (root) root.style.display = on && !hidden ? '' : 'none';
     document.querySelectorAll('[data-retro]').forEach(b => b.classList.toggle('on', on && !hidden));
@@ -581,6 +588,7 @@
   // ---------- encender / apagar
   async function set(v){
     on = v; LSset('vretro2', v); if (v){ hidden = false; LSset('vwinmin', false); }
+    if (!v && root) root.style.display = 'none';
     apply(); hook();
     if (v && !skin) loadSel();
   }
@@ -601,6 +609,6 @@
     if (slot) new MutationObserver(hook).observe(slot, {childList: true});
     const now = document.getElementById('now');
     if (now) new MutationObserver(() => paintAll()).observe(now, {childList: true, characterData: true, subtree: true});
-    if (on){ apply(); hook(); loadSel(); }
+    apply(); if (on){ hook(); loadSel(); }
   });
 })();

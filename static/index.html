@@ -106,6 +106,10 @@
   .now span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .x{background:none;border:none;color:var(--muted);padding:0 4px}
   .lng{background:none;border:1px solid var(--line);border-radius:99px;color:var(--muted);padding:3px 7px;font-size:14px;flex:none}
+  .wabtn{font-size:18px;padding:4px 10px;white-space:nowrap}
+  .wabtn span{display:none;font-size:14px;font-weight:600;color:var(--text)}
+  @media (min-width:900px){.wabtn span{display:inline}}
+  @media (max-width:899px){.wabtn{display:none}}   /* en pantallas chicas abre el boton grande de abajo */
   .tools{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--muted);font-size:13px}
   .del{position:absolute;right:5px;top:5px;background:#000b;border:none;border-radius:6px;color:#fff;font-size:12px;padding:3px 7px}
   @media (min-width:700px){.rowscroll .cardv,.skel{flex-basis:22%}.grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
@@ -117,7 +121,7 @@
     <div class="logo"><img src="icon.svg" alt=""><div><b>Offline</b><small>Entertainment</small></div></div>
     <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Spotify, TikTok…)" enterkeyhint="search" autocomplete="off">
     <span class="net" id="net">en línea</span>
-    <button class="lng" data-retro aria-label="Escucha como en los 90">📼</button>
+    <button class="lng wabtn" data-retro aria-label="Escuchar música">📼<span> Escuchar música</span></button>
     <button class="lng" data-lang-pick aria-label="Idioma">🌐</button>
   </div>
   <nav id="nav"></nav>

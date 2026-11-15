@@ -7,7 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
-- The 90s player opens by default (until you close it with ✕), even with nothing downloaded yet.
+- The 90s player opens by default on computers (until you close it with ✕); on phones it starts as a big
+  "📼 Listen to music" button so it doesn't cover half the screen. The button appears whenever the player is hidden.
 - Double-click a skin in the browser to pick it and close the browser.
 
 ## [1.5.0] - 2026-11-15

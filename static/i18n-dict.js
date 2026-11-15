@@ -252,6 +252,7 @@ en: {
 "Ese skin no esta en el catalogo": "That skin isn't in the catalog",
 "El museo de skins no respondio. Intenta otra vez.": "The skin museum didn't respond. Try again.",
 "Demasiados pedidos. Intenta en un rato.": "Too many requests. Try again in a bit.",
+"Escuchar música": "Listen to music",
 "noticias": "news"
 },
 pt: {
@@ -506,6 +507,7 @@ pt: {
 "Ese skin no esta en el catalogo": "Essa skin não está no catálogo",
 "El museo de skins no respondio. Intenta otra vez.": "O museu de skins não respondeu. Tente de novo.",
 "Demasiados pedidos. Intenta en un rato.": "Muitas solicitações. Tente daqui a pouco.",
+"Escuchar música": "Ouvir música",
 "noticias": "notícias"
 },
 zh: {
@@ -760,6 +762,7 @@ zh: {
 "Ese skin no esta en el catalogo": "目录中没有该皮肤",
 "El museo de skins no respondio. Intenta otra vez.": "皮肤博物馆没有响应，请再试一次。",
 "Demasiados pedidos. Intenta en un rato.": "请求过多，请稍后再试。",
+"Escuchar música": "听音乐",
 "noticias": "新闻"
 },
 ru: {
@@ -1014,6 +1017,7 @@ ru: {
 "Ese skin no esta en el catalogo": "Этого скина нет в каталоге",
 "El museo de skins no respondio. Intenta otra vez.": "Музей скинов не ответил. Попробуй ещё раз.",
 "Demasiados pedidos. Intenta en un rato.": "Слишком много запросов. Попробуй чуть позже.",
+"Escuchar música": "Слушать музыку",
 "noticias": "новости"
 },
 ja: {
@@ -1268,6 +1272,7 @@ ja: {
 "Ese skin no esta en el catalogo": "そのスキンはカタログにありません",
 "El museo de skins no respondio. Intenta otra vez.": "スキンミュージアムが応答しませんでした。もう一度お試しください。",
 "Demasiados pedidos. Intenta en un rato.": "リクエストが多すぎます。しばらくしてからお試しください。",
+"Escuchar música": "音楽を聴く",
 "noticias": "ニュース"
 }
 };
