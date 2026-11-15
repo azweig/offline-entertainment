@@ -9,6 +9,9 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b1017">
+<script src="i18n-dict.js"></script>
+<script src="i18n.js"></script>
+<script src="retro.js"></script>
 <style>
   :root{--bg:#0b1017;--panel:#141d28;--line:#223041;--text:#eef2f6;--muted:#8799ab;
         --accent:#f2a33a;--ink:#1b1206;--err:#ef6b6b;--ok:#4cc38a}
@@ -102,6 +105,7 @@
   .now{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);margin-bottom:6px}
   .now span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .x{background:none;border:none;color:var(--muted);padding:0 4px}
+  .lng{background:none;border:1px solid var(--line);border-radius:99px;color:var(--muted);padding:3px 7px;font-size:14px;flex:none}
   .tools{display:flex;justify-content:space-between;align-items:center;margin-top:14px;color:var(--muted);font-size:13px}
   .del{position:absolute;right:5px;top:5px;background:#000b;border:none;border-radius:6px;color:#fff;font-size:12px;padding:3px 7px}
   @media (min-width:700px){.rowscroll .cardv,.skel{flex-basis:22%}.grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
@@ -113,6 +117,7 @@
     <div class="logo"><img src="icon.svg" alt=""><div><b>Offline</b><small>Entertainment</small></div></div>
     <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Spotify, TikTok…)" enterkeyhint="search" autocomplete="off">
     <span class="net" id="net">en línea</span>
+    <button class="lng" data-lang-pick aria-label="Idioma">🌐</button>
   </div>
   <nav id="nav"></nav>
 </div>
@@ -135,7 +140,10 @@ const ago = ts => { if (!ts) return ''; const d = (Date.now()/1000 - ts) / 86400
   if (d < 30) { const n = Math.floor(d/7); return `hace ${n} semana${n > 1 ? 's' : ''}`; }
   if (d < 360) { const n = Math.max(1, Math.floor(d/30)); return `hace ${n} mes${n > 1 ? 'es' : ''}`; }
   const n = Math.max(1, Math.floor(d/365)); return `hace ${n} año${n > 1 ? 's' : ''}`; };
-const fecha = ymd => ymd ? `${+ymd.slice(6,8)} ${MESES[+ymd.slice(4,6)-1]} ${ymd.slice(0,4)}` : '';
+// fecha en el formato del idioma elegido (22 sep 2007 · Sep 22, 2007 · 2007年9月22日 ...)
+const fecha = ymd => { if (!ymd) return ''; const d = new Date(Date.UTC(+ymd.slice(0,4), +ymd.slice(4,6)-1, +ymd.slice(6,8)));
+  try { return d.toLocaleDateString(document.documentElement.lang || 'es', {day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'}); }
+  catch { return `${+ymd.slice(6,8)} ${MESES[+ymd.slice(4,6)-1]} ${ymd.slice(0,4)}`; } };
 const vistas = n => n == null ? '' : n >= 1e6 ? `${(n/1e6).toFixed(1).replace('.0','').replace('.',',')} M de vistas` : n >= 1e3 ? `${Math.round(n/1e3)} mil vistas` : `${n} vistas`;
 let order = '', searchTok = 0, stype = 'videos', lastQ = '';   // pestaña del buscador: videos | playlists   // '' relevancia | 'new' mas nuevos | 'old' mas antiguos
 const dur = s => { if (!s) return ''; s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = String(s%60).padStart(2,'0'); return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`; };
@@ -143,10 +151,11 @@ const kindOf = n => /\.(mp3|m4a|opus|ogg)$/i.test(n) ? 'audio' : 'video';
 const titleOf = n => n.replace(/\.[^.]+$/, '').replace(/\s*\[[^\]]+\]$/, '').replace(/\s*\{[^}]+\}$/, '');
 const MIME = {mp3:'audio/mpeg', m4a:'audio/mp4', opus:'audio/ogg', ogg:'audio/ogg', mp4:'video/mp4', webm:'video/webm', mkv:'video/x-matroska', thumb:'image/jpeg'};
 const SECTIONS = [
-  {k:'musica',   t:'Música',    q:'música',    mode:'audio'},
-  {k:'noticias', t:'Noticias',  q:'noticias de hoy', mode:'video'},
-  {k:'series',   t:'Series',    q:'series',    mode:'video'},
-  {k:'peliculas',t:'Películas', q:'películas', mode:'video'},
+  // q: lo que se busca en YouTube, en el idioma elegido
+  {k:'musica',   t:'Música',    q:(window.t || String)('música'),    mode:'audio'},
+  {k:'noticias', t:'Noticias',  q:(window.t || String)('noticias de hoy'), mode:'video'},
+  {k:'series',   t:'Series',    q:(window.t || String)('series'),    mode:'video'},
+  {k:'peliculas',t:'Películas', q:(window.t || String)('películas'), mode:'video'},
 ];
 let online = false;  // conexion REAL con el servidor (navigator.onLine solo dice si hay wifi/datos)
 // clave por enlace (http://.../#k=CLAVE): el fragmento no llega al servidor; se guarda y se borra de la barra
@@ -323,7 +332,7 @@ async function go(v, query){
     return;
   }
   const sec = SECTIONS.find(s => s.k === v), mode = sec ? sec.mode : 'video';
-  const q = query ? (sec ? `${query} ${sec.t.toLowerCase()}` : query) : sec.q;
+  const q = query ? (sec ? `${query} ${(window.t || String)(sec.t.toLowerCase())}` : query) : sec.q;
   if (q !== lastQ){ lastQ = q; stype = 'videos'; }   // cada busqueda nueva abre en "Videos"
   const head = () => `<div class="sorth"><h2>${esc(query ? `Resultados: ${query}` : sec.t)}</h2>
     ${stype === 'videos' ? `<select id="ord" aria-label="Ordenar"><option value="">Más relevantes</option><option value="new">Más nuevos primero</option><option value="old">Más antiguos primero</option></select>` : ''}</div>
@@ -700,7 +709,7 @@ async function renderLibrary(){
   const P = isPl(libFilter) ? all[libFilter.slice(3)] : null, asList = libFilter === 'audio' || !!P;
   const mus = music(scopeOf(libFilter)), y = window.scrollY, falta = P ? P.items.filter(x => !mus.some(i => idOf(i.name) === x.id)) : [];
   const bar = (mus.length || P) && libFilter !== 'video' ? `<div class="mbar">${mus.length ? `<button class="btn" id="mplay">▶ ${P ? 'Reproducir esta playlist' : 'Reproducir música'} (${mus.length})</button>
-      <button class="tg ${shuffle ? 'on' : ''}" id="mshuf">🔀 Aleatorio</button><button class="tg ${repeat ? 'on' : ''}" id="mrep">🔁 Repetir</button>` : ''}
+      <button class="tg ${shuffle ? 'on' : ''}" id="mshuf">🔀 Aleatorio</button><button class="tg ${repeat ? 'on' : ''}" id="mrep">🔁 Repetir</button><button class="tg ${window.Retro?.on ? 'on' : ''}" data-retro>📼 Escucha como en los 90</button>` : ''}
       ${asList ? (mus.length > 1 ? `<button class="tg ${sorting ? 'on' : ''}" id="msort">↕ ${sorting ? 'Listo' : 'Cambiar orden'}</button>` : '') : `<button class="tg" id="mlist">Ver lista de canciones</button>`}
       ${P && falta.length && online ? `<button class="tg" id="mfalta">⬇ Bajar las que faltan (${falta.length})</button>` : ''}
       ${P ? `<button class="tg" id="mquitar">Quitar playlist</button>` : ''}</div>` : '';

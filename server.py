@@ -576,7 +576,7 @@ def csp() -> str:
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     hashes = " ".join("'sha256-" + base64.b64encode(hashlib.sha256(m.encode()).digest()).decode() + "'"
                       for m in re.findall(r"<script>(.*?)</script>", html, re.S))
-    return ("default-src 'none'; script-src " + hashes + "; style-src 'self' 'unsafe-inline'; "
+    return ("default-src 'none'; script-src 'self' " + hashes + "; style-src 'self' 'unsafe-inline'; "
             "img-src 'self' https://i.ytimg.com data: blob:; media-src 'self' blob:; connect-src 'self' data:; "
             "worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
@@ -657,7 +657,7 @@ class H(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             return self.static("index.html")
-        if path in ("/sw.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png",
+        if path in ("/sw.js", "/manifest.webmanifest", "/icon.svg", "/i18n.js", "/i18n-dict.js", "/retro.js", "/icon-192.png",
                     "/icon-512.png", "/apple-touch-icon.png"):
             return self.static(path[1:])
         if not path.startswith("/api/"):

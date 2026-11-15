@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-15
+
+### Added
+- Six languages: Spanish, English, Portuguese, Chinese, Russian and Japanese. Picked from the browser,
+  changeable with the 🌐 button and remembered per device. `static/i18n.js` translates what reaches the
+  screen (including server messages, dialogs and accessibility labels) from `static/i18n-dict.js`;
+  dates follow the language and the home rows search YouTube in it. A test checks that every language
+  has every string and the same placeholders.
+- "Listen like it's the 90s": an optional retro music player (LCD time, scrolling title, spectrum bars,
+  beveled buttons, retro playlist window) with 20 original color themes, remembered per device. It
+  drives the same `<audio>` element, so lock-screen playback keeps working; the spectrum is real on
+  computers and animated on phones (where the audio is never routed through Web Audio).
+
+### Changed
+- CSP `script-src` also allows `'self'` for the new `i18n.js`, `i18n-dict.js` and `retro.js`
+  (still no inline scripts other than the hashed one); they are part of the offline app shell.
+
 ## [1.2.0] - 2026-11-15
 
 ### Added
@@ -56,7 +73,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azweig/offline-entertainment/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azweig/offline-entertainment/compare/v0.1.0...v1.0.0

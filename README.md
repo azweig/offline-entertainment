@@ -69,6 +69,8 @@ No accounts. No central service. No middlemen. The server keeps nothing.
   you already saved (no account needed).
 - An info sheet before saving: publish date, views, duration and description.
 - Paste a link from YouTube or [10 other sites](#supported-sites): Facebook, Instagram, TikTok, X and more.
+- Paste a public **Spotify** playlist, album or artist: the app reads the song list and saves each song
+  from YouTube Music.
 
 **Save**
 - Video (360p, 480p or 720p, H.264 MP4 that plays on iPhone and Android) or audio only (MP3).
@@ -82,6 +84,12 @@ No accounts. No central service. No middlemen. The server keeps nothing.
   lock-screen controls. Broken songs are skipped.
 - Your own playlists, a filter by playlist, and "download the missing ones".
 - Deleting anything asks for confirmation first.
+- **Listen like it's the 90s:** an optional retro player with an LCD display, scrolling title,
+  spectrum bars and 20 original color themes. It remembers your theme on each device.
+
+**Six languages**
+- Español, English, Português, 中文, Русский and 日本語, picked from the browser and changeable with 🌐.
+  Dates follow the language and the home rows search YouTube in it.
 
 ## Supported sites
 

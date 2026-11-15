@@ -218,6 +218,11 @@ class Hardening(Auth):   # reusa el servidor de prueba de Auth
         self.assertIn("'sha256-", script_src)
         self.assertNotIn("unsafe", script_src)
         self.assertNotIn("onerror=", body)   # la CSP no permite manejadores en linea
+        self.assertNotIn("http", script_src)    # ningun script de otro sitio
+        import re
+        for src in re.findall(r'<script src="([^"]+)"', body):   # los scripts propios existen y son publicos
+            with urlopen(f"{self.base}/{src}", timeout=5) as r:
+                self.assertEqual(r.status, 200, src)
         self.assertEqual(self.call("/api/ping", KEY)[0], 200)
 
     def test_n_fuera_de_rango_no_llega_a_ytdlp(self):
@@ -358,6 +363,24 @@ class Spotify(unittest.TestCase):
         ydl.__enter__.return_value.extract_info.return_value = es
         with mock.patch.object(server, "check_url", lambda u: u), mock.patch.object(server.yt_dlp, "YoutubeDL", return_value=ydl):
             self.assertEqual(server.find_song("Take On Me", "a-ha"), "bbbbbbbbbbb")
+
+
+class Translations(unittest.TestCase):
+    """Cada idioma tiene todas las claves (texto en espanol) con los mismos {n}."""
+
+    def test_diccionario_completo(self):
+        import re
+        js = (Path(server.STATIC) / "i18n-dict.js").read_text(encoding="utf-8")
+        body = js[js.index("{"):js.rindex("}") + 1]
+        d = json.loads(re.sub(r"^(\w\w): ", r'"\1": ', body, flags=re.M))
+        self.assertEqual(set(d), {"en", "pt", "zh", "ru", "ja"})
+        ref = set(d["en"])
+        self.assertGreater(len(ref), 150)
+        for lang, m in d.items():
+            self.assertEqual(set(m), ref, lang)
+            for k, v in m.items():
+                self.assertTrue(v.strip(), (lang, k))
+                self.assertEqual(sorted(re.findall(r"\{\d\}", k)), sorted(re.findall(r"\{\d\}", v)), (lang, k))
 
 
 if __name__ == "__main__":

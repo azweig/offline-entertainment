@@ -70,7 +70,7 @@ flowchart LR
 | T7 | SSRF to the home network via a pasted link | Elevation of privilege | Site allowlist, strict host syntax, URL rebuilt, exact extractors, DNS check, **connect-time guard** | ✅ Mitigated (see review M1, M3) |
 | T8 | SSRF via redirects, HLS/DASH segments, DNS changes | Elevation of privilege | Connect-time guard on every socket; no redirects for thumbnails; native HLS downloader | ✅ Mitigated |
 | T9 | Path traversal (static files, job IDs, filenames) | Tampering, information disclosure | Fixed list of static files; job IDs `[0-9a-f]{16}`; filenames from `iterdir()` of the job folder | ✅ Mitigated |
-| T10 | XSS from titles/descriptions of remote content | Tampering | `esc()` / `textContent` everywhere; strict CSP with script hash; thumbnails as checked `data:` URIs | ✅ Mitigated |
+| T10 | XSS from titles/descriptions of remote content | Tampering | `esc()` / `textContent` everywhere; strict CSP: the inline script by hash plus same-origin files only (`i18n.js`, `i18n-dict.js`, `retro.js`), never inline handlers or remote scripts; thumbnails as checked `data:` URIs | ✅ Mitigated |
 | T11 | Clickjacking | Tampering | `frame-ancestors 'none'`, `X-Frame-Options: DENY` | ✅ Mitigated |
 | T12 | Exhaust threads with idle connections (slowloris) | Denial of service | 15 s request timeout, max 64 simultaneous connections | ⚠️ Reduced (see residual risks) |
 | T13 | Fill the disk | Denial of service | 1.2 GB per job counting every stream and fragment, 2 jobs, 3 GB free-space floor, 60 min pick-up/resume window, 60 s stalled-transfer timeout, temp dir removed on exit | ✅ Mitigated |

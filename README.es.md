@@ -72,6 +72,8 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   guardaste (sin cuenta).
 - Ficha antes de guardar: fecha de publicación, vistas, duración y descripción.
 - Pega un enlace de YouTube o de [otros 10 sitios](#sitios-compatibles): Facebook, Instagram, TikTok, X y más.
+- Pega una playlist, un álbum o un artista público de **Spotify**: la app lee la lista de canciones y
+  guarda cada una desde YouTube Music.
 
 **Guardar**
 - Video (360p, 480p o 720p, MP4 H.264 que se reproduce en iPhone y Android) o solo audio (MP3).
@@ -85,6 +87,12 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   propio orden y controles en la pantalla bloqueada. Salta las canciones dañadas.
 - Tus propias playlists, filtro por playlist y "bajar las que faltan".
 - Borrar cualquier cosa siempre pide confirmación.
+- **Escucha como en los 90:** un reproductor retro opcional con pantalla LCD, título que corre, barras
+  de espectro y 20 temas de color originales. Recuerda tu tema en cada dispositivo.
+
+**Seis idiomas**
+- Español, English, Português, 中文, Русский y 日本語, según el navegador y cambiable con 🌐. Las
+  fechas siguen el idioma y las filas de Inicio buscan en YouTube en ese idioma.
 
 ## Sitios compatibles
 

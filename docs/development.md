@@ -29,6 +29,8 @@ Requirements: Python 3.11+, ffmpeg and Deno (see [self-hosting.md](self-hosting.
 server.py                 the whole server (see docs/architecture.md §4)
 static/index.html         the whole app: UI, storage, queue, player
 static/sw.js              service worker (offline app shell)
+static/i18n.js, i18n-dict.js  languages (see Translations below)
+static/retro.js           the optional 90s-style music player and its 20 themes
 static/manifest.webmanifest, icon.svg, *.png
 tests/test_server.py      auth, key file, link guard, DNS blocking, job start
 scripts/smoke.sh          real start-up check used by CI and `make smoke`
@@ -69,6 +71,26 @@ docs/                     architecture, API (+ OpenAPI), security, self-hosting,
 3. Test with public content while logged out: `/api/link?url=…` and a real save in audio and video.
 4. Add tests for accepted and rejected URLs of that site.
 5. Add the site to the tables in `README.md` and `README.es.md`, and to `CHANGELOG.md`.
+
+## Translations
+
+The app speaks Spanish, English, Portuguese, Chinese, Russian and Japanese.
+
+- **Spanish is the source.** Code and server messages are written in Spanish, as before.
+- `static/i18n.js` translates what reaches the screen: text nodes, `placeholder` / `aria-label` /
+  `title`, `alert` / `confirm` / `prompt` and the page title. A `MutationObserver` does it as the app
+  renders, so no string in `index.html` has to be wrapped. Song and video titles (`.ti`) and anything
+  under `[data-noi18n]` are left alone.
+- `static/i18n-dict.js` holds the translations: `{lang: {"texto en español": "translation"}}`.
+  `{0}`, `{1}` mark parts that change (`"Guardando… {0}%"`), and a line like
+  `"Spotify · Pitbull · 18 canciones"` is translated piece by piece around ` · ` and ` — `.
+- The language comes from the browser, can be changed with the 🌐 button and is kept in
+  `localStorage` (`vlang`). Dates use `toLocaleDateString` in that language.
+
+**Adding or changing text:** write it in Spanish as usual, then add the same Spanish string as a key
+to every language in `i18n-dict.js`. `make test` fails if a language is missing a key or a
+placeholder. Anything without a translation simply shows in Spanish, so check the screen in another
+language before releasing.
 
 ## Releasing
 
