@@ -383,6 +383,21 @@ class Translations(unittest.TestCase):
                 self.assertEqual(sorted(re.findall(r"\{\d\}", k)), sorted(re.findall(r"\{\d\}", v)), (lang, k))
 
 
+class Profiles(Auth):   # reusa el servidor de prueba de Auth
+    """Perfiles locales: el archivo se sirve sin clave y se carga antes que todo lo que lee preferencias."""
+
+    def test_se_sirve_y_se_carga_primero(self):
+        with urlopen(self.base + "/profiles.js", timeout=5) as r:
+            self.assertEqual(r.status, 200)
+            js = r.read().decode()
+        for shared in ("'vk'", "'vprofs'", "'vprof'"):   # la clave del servidor y la lista de perfiles no van por perfil
+            self.assertIn(shared, js)
+        html = (Path(server.STATIC) / "index.html").read_text(encoding="utf-8")
+        self.assertLess(html.index('src="profiles.js"'), html.index('src="i18n.js"'))
+        self.assertLess(html.index('src="profiles.js"'), html.index('src="retro.js"'))
+        self.assertIn("profiles.js", (Path(server.STATIC) / "sw.js").read_text(encoding="utf-8"))
+
+
 class Skins(Auth):   # reusa el servidor de prueba de Auth
     """Catalogo de skins: busca por nombre y categoria; solo sirve los que estan en el catalogo."""
 

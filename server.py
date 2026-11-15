@@ -754,8 +754,8 @@ class H(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
             return self.static("index.html")
-        if path in ("/sw.js", "/manifest.webmanifest", "/icon.svg", "/i18n.js", "/i18n-dict.js", "/retro.js", "/icon-192.png",
-                    "/icon-512.png", "/apple-touch-icon.png"):
+        if path in ("/sw.js", "/manifest.webmanifest", "/icon.svg", "/i18n.js", "/i18n-dict.js", "/profiles.js", "/retro.js",
+                    "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"):
             return self.static(path[1:])
         if not path.startswith("/api/"):
             return self.js({"error": "no encontrado"}, 404)

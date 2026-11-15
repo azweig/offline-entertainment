@@ -101,6 +101,9 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   siga con la pantalla bloqueada.
 
 **Seis idiomas**
+- **Perfiles sin cuentas:** varias personas en el mismo celular (tú, tus hijos…) tienen cada una su
+  idioma, skin y ventanas del reproductor, ecualizador y playlists. Abre con el último perfil usado; se
+  cambia desde el botón 🙂. Todo queda en el navegador de ese dispositivo; las descargas se comparten.
 - Español, English, Português, 中文, Русский y 日本語, según el navegador y cambiable con 🌐. Las
   fechas siguen el idioma y las filas de Inicio buscan en YouTube en ese idioma.
 

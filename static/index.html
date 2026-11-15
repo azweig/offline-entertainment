@@ -9,6 +9,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b1017">
+<script src="profiles.js"></script>
 <script src="i18n-dict.js"></script>
 <script src="i18n.js"></script>
 <script src="retro.js"></script>
@@ -106,6 +107,8 @@
   .now span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .x{background:none;border:none;color:var(--muted);padding:0 4px}
   .lng{background:none;border:1px solid var(--line);border-radius:99px;color:var(--muted);padding:3px 7px;font-size:14px;flex:none}
+  .prof{font-size:16px;white-space:nowrap}.prof span{display:inline-block;max-width:8em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;font-size:13px;color:var(--text)}
+  @media (max-width:600px){.prof span{display:none}}
   .wabtn{font-size:18px;padding:4px 10px;white-space:nowrap}
   .wabtn span{display:none;font-size:14px;font-weight:600;color:var(--text)}
   @media (min-width:900px){.wabtn span{display:inline}}
@@ -122,6 +125,7 @@
     <input class="search" id="q" type="search" placeholder="Buscar o pegar un enlace (YouTube, Spotify, TikTok…)" enterkeyhint="search" autocomplete="off">
     <span class="net" id="net">en línea</span>
     <button class="lng wabtn" data-retro aria-label="Escuchar música">📼<span> Escuchar música</span></button>
+    <button class="lng prof" data-prof aria-label="Perfil">🙂</button>
     <button class="lng" data-lang-pick aria-label="Idioma">🌐</button>
   </div>
   <nav id="nav"></nav>

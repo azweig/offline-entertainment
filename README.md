@@ -97,6 +97,9 @@ No accounts. No central service. No middlemen. The server keeps nothing.
   computers; on phones it is visual so lock-screen playback keeps working.
 
 **Six languages**
+- **Profiles without accounts:** several people on the same phone (you, your kids…) each keep their own
+  language, player skin and windows, equalizer and playlists. It opens with the last profile used; switch
+  from the 🙂 button. Everything stays in the browser on that device; downloads are shared.
 - Español, English, Português, 中文, Русский and 日本語, picked from the browser and changeable with 🌐.
   Dates follow the language and the home rows search YouTube in it.
 

@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-15
+
+### Added
+- 🙂 Local profiles, no accounts: several people on one device each keep their own preferences (language,
+  90s player skin, windows and equalizer, playlists, order, shuffle/repeat). The last profile used opens
+  automatically; switch, add, rename or delete profiles from the 🙂 button (deleting asks for confirmation).
+  Profiles live only in the browser's `localStorage` (`static/profiles.js` namespaces each profile's keys);
+  nothing is sent to the server. Downloads, the server key and running downloads are shared by the device.
+
 ## [1.6.0] - 2026-11-15
 
 ### Added
@@ -123,7 +132,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/azweig/offline-entertainment/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/azweig/offline-entertainment/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/azweig/offline-entertainment/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...v1.4.0
