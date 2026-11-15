@@ -383,5 +383,52 @@ class Translations(unittest.TestCase):
                 self.assertEqual(sorted(re.findall(r"\{\d\}", k)), sorted(re.findall(r"\{\d\}", v)), (lang, k))
 
 
+class Skins(Auth):   # reusa el servidor de prueba de Auth
+    """Catalogo de skins: busca por nombre y categoria; solo sirve los que estan en el catalogo."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        import sqlite3
+        cls.tmp = tempfile.mkdtemp()
+        db = Path(cls.tmp) / "skins.db"
+        c = sqlite3.connect(db)
+        c.executescript("""CREATE TABLE skins(md5 TEXT PRIMARY KEY, name TEXT, filename TEXT, readme TEXT, cats TEXT,
+                                              rank INTEGER, featured INTEGER);
+          CREATE VIRTUAL TABLE skins_fts USING fts5(name, readme, cats, content='skins', content_rowid='rowid');""")
+        c.executemany("INSERT INTO skins VALUES (?,?,?,?,?,?,?)", [
+            ("a" * 32, "Matrix Reloaded", "matrix.wsz", "neo", "Películas", 2, 0),
+            ("b" * 32, "Dragon Ball Z", "dbz.wsz", "goku", "Anime", 1, 1),
+            ("c" * 32, "base 2.91", "base.wsz", "", "Clásicos de Winamp", 3, 1)])
+        c.execute("INSERT INTO skins_fts(rowid, name, readme, cats) SELECT rowid, name, readme, cats FROM skins")
+        c.commit()
+        c.close()
+        server.SKIN_DB, server.SKIN_CACHE = db, Path(cls.tmp) / "cache"
+
+    def test_busca_por_nombre_y_categoria(self):
+        st, d = self.call("/api/skins?q=dragon", KEY)
+        self.assertEqual((st, [i["name"] for i in d["items"]]), (200, ["Dragon Ball Z"]))
+        st, d = self.call("/api/skins?cat=" + quote("Películas"), KEY)
+        self.assertEqual([i["md5"] for i in d["items"]], ["a" * 32])
+        st, d = self.call("/api/skins", KEY)
+        self.assertEqual(d["total"], 3)
+        st, d = self.call("/api/skins/cats", KEY)
+        self.assertEqual(d["total"], 3)
+
+    def test_solo_skins_del_catalogo(self):
+        st, d = self.call("/api/skins/" + "f" * 32 + ".wsz", KEY)
+        self.assertEqual(st, 404)
+        self.assertEqual(self.call("/api/skins?q=x")[0], 401)   # tambien pide la clave
+
+    def test_el_archivo_tiene_que_coincidir_con_su_md5(self):
+        class R:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, n): return b"PK otro archivo"
+        with mock.patch.object(server, "check_url", lambda u: u), mock.patch.object(server.OPENER, "open", lambda *a, **k: R()):
+            with self.assertRaises(ValueError):
+                server.skin_fetch("a" * 32, "wsz")
+
+
 if __name__ == "__main__":
     unittest.main()

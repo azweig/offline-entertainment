@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-15
+
+### Added
+- The 90s player is now a floating set of windows (main, 10-band equalizer, playlist) drawn from the
+  skin's sprites: drag, dock/snap, shade, double size, minimize to a 📼 button, resize the playlist.
+  A 📼 button in the top bar opens it from anywhere; the classic base skin opens by default.
+- Optional skin catalog: `make skins` (`scripts/skins_index.py`) indexes the Winamp Skin Museum's
+  public metadata (~100k classic skins; adult content excluded by the museum's flag and a word filter)
+  into `skins.db` in the config dir. `GET /api/skins` (search by name/category), `/api/skins/cats`,
+  `/api/skins/{md5}.png|.wsz` fetch a skin from the museum only when chosen (md5 verified, disk cache).
+- Real equalizer and spectrum on computers (Web Audio); visual-only on phones.
+
+### Removed
+- The 20 built-in color themes (replaced by real skins).
+
 ## [1.4.0] - 2026-11-15
 
 ### Added
@@ -85,7 +100,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/azweig/offline-entertainment/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...v1.2.0

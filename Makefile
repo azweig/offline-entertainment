@@ -5,7 +5,7 @@ BIN := $(VENV)/bin
 PORT ?= 8765
 
 .DEFAULT_GOAL := help
-.PHONY: help setup run run-lan test lint smoke check docker-up docker-down key update clean
+.PHONY: help setup run run-lan test lint smoke check docker-up docker-down key update skins clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -50,6 +50,9 @@ key: ## Print your key and the one-tap link
 
 update: $(BIN)/python ## Update yt-dlp (do this first when a site stops working)
 	$(BIN)/pip install -U "yt-dlp[default]"
+
+skins: $(BIN)/python ## Optional: build the searchable catalog of classic skins (~8 min, ~55 MB, no skins downloaded)
+	$(BIN)/python scripts/skins_index.py
 
 clean: ## Remove the virtualenv and caches (your key is kept)
 	rm -rf $(VENV) __pycache__ tests/__pycache__ .ruff_cache

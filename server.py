@@ -16,10 +16,11 @@ para verlos sin conexion (YouTube, Facebook, Instagram, TikTok y mas).
 Uso:  python server.py [--port 8765] [--host 127.0.0.1]
 """
 import argparse, base64, hashlib, hmac, ipaddress, json, mimetypes, os, re, secrets, shutil, signal, socket, stat, sys
-import tempfile, threading, time, uuid
+import sqlite3, tempfile, threading, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, quote
+import urllib.request
 from urllib.request import HTTPRedirectHandler, build_opener
 
 import yt_dlp
@@ -356,6 +357,102 @@ def search(q: str, n: int = 12, sort: str = "") -> list[dict]:
         dated = sorted((x for x in out if x["ts"]), key=lambda x: x["ts"], reverse=sort == "new")
         out = dated + [x for x in out if not x["ts"]]
     return out
+
+
+# ---------- skins clasicos (Winamp Skin Museum): catalogo local (skins_index.py) + archivos pedidos al museo
+# solo cuando alguien elige uno. Solo se sirven los del catalogo (sin +18). Cache en disco con tope.
+# Opcional: sin catalogo (make skins) el reproductor igual funciona con los .wsz que sube cada uno.
+SKIN_DB = Path(os.environ.get("OFFLINE_SKIN_DB") or "") if os.environ.get("OFFLINE_SKIN_DB") else None   # main() lo fija
+SKIN_CACHE = None
+SKIN_CACHE_MAX = 500_000_000       # bytes entre .wsz y capturas; se borran los menos usados
+DEFAULT_SKIN = "5e4f10275dcb1fb211d4a8b4f1bda236"   # base 2.91, el Winamp clasico
+MD5 = re.compile(r"[0-9a-f]{32}")
+
+
+def skin_db():
+    return sqlite3.connect(f"file:{SKIN_DB}?mode=ro", uri=True, timeout=5) if SKIN_DB and SKIN_DB.exists() else None
+
+
+def skin_known(md5: str) -> str | None:
+    db = skin_db()
+    if not db:
+        return None
+    with db:
+        r = db.execute("SELECT name FROM skins WHERE md5=?", (md5,)).fetchone()
+    db.close()
+    return r[0] if r else None
+
+
+def skin_search(q: str, cat: str, off: int) -> dict:
+    db = skin_db()
+    if not db:
+        return {"total": 0, "items": []}
+    where, args = [], []
+    words = re.findall(r"\w+", q.lower())[:6]
+    if words:
+        where.append("s.rowid IN (SELECT rowid FROM skins_fts WHERE skins_fts MATCH ?)")
+        args.append(" ".join(f'"{w}"*' for w in words))
+    if cat:
+        where.append("('|' || s.cats || '|') LIKE ?")
+        args.append(f"%|{cat}|%")
+    w = ("WHERE " + " AND ".join(where)) if where else ""
+    with db:
+        # w solo junta fragmentos fijos de este archivo; lo que escribe el usuario va siempre como parametro (?)
+        total = db.execute(f"SELECT count(*) FROM skins s {w}", args).fetchone()[0]  # noqa: S608
+        rows = db.execute(f"SELECT md5, name, cats FROM skins s {w} ORDER BY featured DESC, rank LIMIT 60 OFFSET ?",  # noqa: S608
+                          [*args, off]).fetchall()
+    db.close()
+    return {"total": total, "items": [{"md5": m, "name": n, "cats": [c for c in (k or "").split("|") if c]} for m, n, k in rows]}
+
+
+def skin_cats() -> list:
+    hit = cached("/api/skins/cats")
+    if hit is not None:
+        return hit
+    db = skin_db()
+    if not db:
+        return []
+    from collections import Counter
+    c = Counter()
+    with db:
+        for (k,) in db.execute("SELECT cats FROM skins"):
+            c.update(x for x in (k or "").split("|") if x)
+        total = db.execute("SELECT count(*) FROM skins").fetchone()[0]
+    db.close()
+    val = {"total": total, "cats": [{"name": n, "count": v} for n, v in c.most_common()]}
+    put_cache("/api/skins/cats", val)
+    return val
+
+
+def skin_fetch(md5: str, kind: str) -> bytes:
+    """El .wsz o la captura de un skin del catalogo: del disco si ya se pidio, si no del museo."""
+    ext, cap = (".wsz", 3_000_000) if kind == "wsz" else (".png", 600_000)
+    f = SKIN_CACHE / (md5 + ext)
+    if f.exists():
+        os.utime(f)
+        return f.read_bytes()
+    url = (f"https://r2.webampskins.org/skins/{md5}.wsz" if kind == "wsz"
+           else f"https://r2.webampskins.org/screenshots/{md5}.png")
+    req = urllib.request.Request(check_url(url), headers={"User-Agent": "Mozilla/5.0 (compatible; offline-player)"})
+    with OPENER.open(req, timeout=20) as r:
+        b = r.read(cap + 1)
+    if len(b) > cap:
+        raise ValueError("demasiado grande")
+    if kind == "wsz" and hashlib.md5(b).hexdigest() != md5:   # noqa: S324  (el museo identifica cada skin por su md5)
+        raise ValueError("archivo distinto al esperado")
+    if kind == "png" and not b.startswith(b"\x89PNG"):
+        raise ValueError("no es una imagen")
+    SKIN_CACHE.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_bytes(b)
+    tmp.replace(f)
+    files = sorted(SKIN_CACHE.iterdir(), key=lambda p: p.stat().st_mtime)
+    size = sum(p.stat().st_size for p in files)
+    while files and size > SKIN_CACHE_MAX:
+        old = files.pop(0)
+        size -= old.stat().st_size
+        old.unlink(missing_ok=True)
+    return b
 
 
 CACHE: dict[str, tuple[float, object]] = {}
@@ -718,6 +815,31 @@ class H(BaseHTTPRequestHandler):
                 return self.js({"error": friendly(exc)}, 502)
             put_cache("/api/link:" + s[2], val)
             return self.js(val)
+        if path == "/api/skins":
+            try:
+                off = max(0, min(int((qs.get("o") or ["0"])[0]), 120000))
+            except ValueError:
+                off = 0
+            q = (qs.get("q") or [""])[0].strip()[:80]
+            cat = (qs.get("cat") or [""])[0].strip()[:40]
+            return self.js(skin_search(q, cat, off))
+        if path == "/api/skins/cats":
+            return self.js(skin_cats())
+        m = re.fullmatch(r"/api/skins/([0-9a-f]{32})\.(wsz|png)", path)
+        if m:
+            md5, kind = m.group(1), m.group(2)
+            if not skin_known(md5):
+                return self.js({"error": "Ese skin no esta en el catalogo"}, 404)
+            try:
+                b = skin_fetch(md5, kind)
+            except Exception:  # noqa: BLE001
+                return self.js({"error": "El museo de skins no respondio. Intenta otra vez."}, 502)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip" if kind == "wsz" else "image/png")
+            self.send_header("Content-Length", str(len(b)))
+            self.send_header("Cache-Control", "public, max-age=2592000, immutable")   # el md5 no cambia nunca
+            self.end_headers()
+            return self.wfile.write(b)
         if path == "/api/spotify":
             kind, sid = (qs.get("kind") or [""])[0], (qs.get("id") or [""])[0]
             if kind not in SP_KINDS or not SP_ID.fullmatch(sid):
@@ -887,6 +1009,9 @@ def main():
     a = ap.parse_args()
     global TMP_ROOT
     KEY, key_file = load_key()
+    global SKIN_DB, SKIN_CACHE
+    SKIN_DB = SKIN_DB or config_dir() / "skins.db"     # catalogo opcional de skins (make skins)
+    SKIN_CACHE = config_dir() / "skincache"
     TMP_ROOT = Path(tempfile.mkdtemp(prefix="offline-entertainment-"))   # nueva, 0700, solo de este proceso
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))                 # docker stop / systemctl stop
     threading.Thread(target=janitor, daemon=True).start()

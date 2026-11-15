@@ -87,11 +87,14 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   propio orden y controles en la pantalla bloqueada. Salta las canciones dañadas.
 - Tus propias playlists, filtro por playlist y "bajar las que faltan".
 - Borrar cualquier cosa siempre pide confirmación.
-- **Escucha como en los 90:** un reproductor opcional con la disposición clásica de 275×116 de los
-  reproductores de escritorio (tiempo grande, espectro, título que corre, kbps/kHz, volumen, balance,
-  barra de posición) y 20 temas de color originales. También lee **skins clásicos de Winamp 2 (.wsz)**
-  que cargas tú, por ejemplo del [Winamp Skin Museum](https://skins.webamp.org/): el archivo se lee en
-  el navegador y se guarda solo en ese dispositivo. No se incluyen skins de terceros.
+- **Escucha como en los 90 (📼):** un reproductor flotante con la forma de los clásicos de escritorio
+  (ventana principal, ecualizador de 10 bandas y lista) que se arrastra, se pega, se achica y se
+  minimiza mientras sigues navegando; la música nunca se corta. Se dibuja con **skins clásicos de
+  Winamp 2 (.wsz)**: sube los tuyos o corre `make skins` una vez para buscar en todo el catálogo del
+  [Winamp Skin Museum](https://skins.webamp.org/) (más de 100.000, por nombre o categoría, sin
+  contenido +18). Cada skin se baja solo al elegirlo y queda en el dispositivo. No se incluyen skins de
+  terceros. El ecualizador cambia el sonido en la compu; en el celular es visual para que la música
+  siga con la pantalla bloqueada.
 
 **Seis idiomas**
 - Español, English, Português, 中文, Русский y 日本語, según el navegador y cambiable con 🌐. Las

@@ -26,6 +26,9 @@ A machine-readable version is in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1); y
 | GET | `/api/artist` | Every video of a channel or @handle (max 200) |
 | GET | `/api/link` | Details of a link from another supported site |
 | GET | `/api/spotify` | Song list of a public Spotify playlist, album, artist or track |
+| GET | `/api/skins` | Search the optional classic-skin catalog (`q`, `cat`, `o`) |
+| GET | `/api/skins/cats` | Catalog categories with counts |
+| GET | `/api/skins/{md5}.png` / `.wsz` | A catalog skin's screenshot or file (fetched from the museum on first use) |
 | GET | `/api/thumb` | A YouTube thumbnail, fetched through the server |
 | POST | `/api/jobs` | Start preparing a file |
 | GET | `/api/jobs/{id}` | Job progress |
@@ -101,6 +104,16 @@ embed page (no account, no key). Only titles and artists are returned; no audio 
 
 To save a song from the list, start a job with `{"song": {"title", "artists"}, "mode": "audio"}` instead of
 `id`/`url`: the job finds the song on YouTube Music (then YouTube search) and saves that video's audio.
+
+### Skins (optional catalog)
+Built with `make skins` into `skins.db` in the config dir; without it these return empty lists / `404`.
+- `GET /api/skins?q=&cat=&o=` → `{"total", "items": [{"md5", "name", "cats": [..]}]}`, 60 per page, featured first.
+- `GET /api/skins/cats` → `{"total", "cats": [{"name", "count"}]}`.
+- `GET /api/skins/{md5}.wsz` · `.png` → the file (`application/zip` / `image/png`). Only md5s present in the
+  catalog are served (adult skins are never in it). The server downloads from the Winamp Skin Museum's
+  public storage on first use, checks the `.wsz` md5, caches it on disk (500 MB cap, least recently
+  used removed first) and answers with `Cache-Control: immutable`. `404` not in catalog · `502` museum
+  unavailable.
 
 ### `GET /api/link?url=`
 `url`: a link from a [supported site](../README.md#supported-sites), max 500 chars.
