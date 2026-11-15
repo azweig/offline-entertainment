@@ -745,8 +745,8 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(p.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(b)))
         self.send_header("Cache-Control", "no-cache")
-        if name == "index.html":
-            self.send_header("Content-Security-Policy", CSP)
+        if name == "index.html":   # se calcula al servir: si se actualiza la pagina sin reiniciar, el hash sigue valiendo
+            self.send_header("Content-Security-Policy", csp())
         self.end_headers()
         self.wfile.write(b)
 
