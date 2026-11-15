@@ -185,7 +185,12 @@ const store = {
     }
     if (navigator.storage?.persist) navigator.storage.persist();
   },
-  tx(mode, fn){ return new Promise((ok, no) => { const t = this.db.transaction('files', mode); const r = fn(t.objectStore('files')); t.oncomplete = () => ok(r.result); t.onerror = () => no(t.error); }); },
+  // Safari a veces no deja guardar un Blob en IndexedDB (p. ej. navegacion privada): entonces se guardan los bytes
+  async idbPut(name, blob){
+    try { await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob})); }
+    catch { const buf = await blob.arrayBuffer(); await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob: buf, type: blob.type})); }
+  },
+  tx(mode, fn){ return new Promise((ok, no) => { const t = this.db.transaction('files', mode); const r = fn(t.objectStore('files')); t.oncomplete = () => ok(r.result); t.onerror = t.onabort = () => no(t.error || new Error('No se pudo guardar')); }); },
   async save(name, response, onProgress = () => {}){
     const reader = response.body.getReader(), total = +response.headers.get('Content-Length') || 0; let done = 0;
     if (this.mode === 'opfs'){
@@ -198,7 +203,7 @@ const store = {
       for(;;){ const {value, done: end} = await reader.read(); if (end) break; parts.push(value); done += value.length; onProgress(total ? done*100/total : 0); }
       if (total && done !== total) throw new Error('Transferencia incompleta');
       const blob = new Blob(parts, {type: MIME[name.split('.').pop().toLowerCase()] || ''});
-      await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob}));
+      await this.idbPut(name, blob);
     }
   },
   async list(){
@@ -216,7 +221,8 @@ const store = {
       const f = await (await this.root.getFileHandle(name)).getFile();
       return f.type ? f : new File([f], name, {type: MIME[name.split('.').pop().toLowerCase()] || ''});
     }
-    return (await this.tx('readonly', s => s.get(name))).blob;
+    const r = await this.tx('readonly', s => s.get(name)); if (!r) throw new Error('No está en este dispositivo');
+    return r.blob instanceof Blob ? r.blob : new Blob([r.blob], {type: r.type || MIME[name.split('.').pop().toLowerCase()] || ''});
   },
   async remove(name){ try { if (this.mode === 'opfs') await this.root.removeEntry(name); else await this.tx('readwrite', s => s.delete(name)); } catch {} },
   // ---- descargas que se pueden retomar: lo recibido se guarda en trozos de 8 MB ya confirmados
@@ -234,7 +240,7 @@ const store = {
   },
   async putBlob(name, blob){
     if (this.mode === 'opfs'){ const w = await (await this.root.getFileHandle(name, {create: true})).createWritable(); await w.write(blob); await w.close(); }
-    else await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob}));
+    else await this.idbPut(name, blob);
   },
   async dropParts(job){ for (const n of await this.names()) if (n.startsWith(job ? `.part-${job}-` : '.part-')) await this.remove(n); },
   async receive(job, name, response, offset, total, onProgress){

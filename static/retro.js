@@ -202,7 +202,7 @@
       <div data-k="pres" class="rht" style="left:255px;width:20px;height:20px;cursor:ns-resize"></div>`;
     root.append(main, eq, pl); wins = {main, eq, pl};
     for (const w of Object.values(wins)) wire_(w);
-    addEventListener('resize', () => { clampAll(); place(); });
+    addEventListener('resize', () => { const sc = SC(); if (W.sc !== sc){ W.sc = sc; stack(); saveW(); } clampAll(); place(); paintAll(); });
   }
 
   // ---------- arrastrar, pegar y achicar
@@ -388,7 +388,10 @@
     if (on) build();
     if (root) root.style.display = on && !hidden ? '' : 'none';
     document.querySelectorAll('[data-retro]').forEach(b => b.classList.toggle('on', on && !hidden));
-    if (on && !hidden){ place(); paintAll(); loop(); }
+    if (on && !hidden){
+      // si cambio la escala (otra pantalla, giro, o posiciones guardadas con otro tamano), se vuelven a apilar
+      const sc = SC(); if (W.sc !== sc){ W.sc = sc; stack(); saveW(); }
+      place(); paintAll(); loop(); }
   }
   let lastTitle = '', marqX = 0, marqT = 0, marq = '';
   function paintAll(){ if (!root || !on || hidden) return; paintMain(); if (W.eq.open) paintEQ(); if (W.pl.open) paintPL(); }
