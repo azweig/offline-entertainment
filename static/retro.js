@@ -602,6 +602,7 @@
   document.addEventListener('click', e => { const b = e.target.closest('[data-retro]'); if (!b) return; e.preventDefault();
     if (!on) set(true); else { hidden = !hidden; LSset('vwinmin', hidden); apply(); } });
   document.addEventListener('visibilitychange', loop);
+  document.addEventListener('library', () => { if (on && !hidden && root) paintPL(); });   // bajo o se borro algo: la lista se actualiza sola
   document.addEventListener('pointerdown', () => { if (on && ctx && ctx.state !== 'running') ctx.resume().catch(() => {}); }, true);
   document.addEventListener('DOMContentLoaded', () => {
     const st = document.createElement('style'); st.textContent = css; document.head.append(st);

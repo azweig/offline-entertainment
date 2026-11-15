@@ -651,6 +651,7 @@ async function refresh(){
   library = all.filter(f => !f.name.endsWith('.thumb')).map(f => ({...f, kind: kindOf(f.name), title: titleOf(f.name), thumb: thumbs.has(f.name + '.thumb')}));
   for (const f of library) if (f.thumb && !thumbUrls[f.name]) try { thumbUrls[f.name] = URL.createObjectURL(await store.blob(f.name + '.thumb')); } catch {}
   nav(); if (view === 'descargas') renderLibrary();
+  document.dispatchEvent(new Event('library'));   // avisa (p. ej. al reproductor de los 90) que cambiaron las descargas
 }
 // ---------- musica: todo lo que bajas es una playlist (orden propio, aleatorio, repetir)
 let shuffle = LS('mshuf', false), repeat = LS('mrep', true), sorting = false, queue = [], qi = -1, queueScope = 'audio', playErr = 0;
