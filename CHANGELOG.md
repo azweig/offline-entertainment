@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-15
+
+### Added
+- The 90s player now uses the classic 275×116 desktop-player layout and can load classic Winamp 2
+  skins (`.wsz`) chosen by the user: a small zip reader (`DecompressionStream`) and the skin's BMP
+  sprites, `TEXT.BMP` font, `VISCOLOR.TXT` and `PLEDIT.TXT` colors. Skins are stored only on the device
+  (hidden file in the app's storage) and can be deleted with confirmation. None are bundled.
+- The app reloads itself when a new version is installed (unless something is downloading or playing).
+
+### Fixed
+- Retro player parts no longer inherit the app's button styles.
+
 ## [1.3.0] - 2026-11-15
 
 ### Added
@@ -73,7 +85,8 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/azweig/offline-entertainment/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/azweig/offline-entertainment/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/azweig/offline-entertainment/compare/v1.0.0...v1.1.0

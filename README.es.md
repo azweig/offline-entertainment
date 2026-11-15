@@ -87,8 +87,11 @@ La documentación técnica está en inglés, como es habitual en proyectos open 
   propio orden y controles en la pantalla bloqueada. Salta las canciones dañadas.
 - Tus propias playlists, filtro por playlist y "bajar las que faltan".
 - Borrar cualquier cosa siempre pide confirmación.
-- **Escucha como en los 90:** un reproductor retro opcional con pantalla LCD, título que corre, barras
-  de espectro y 20 temas de color originales. Recuerda tu tema en cada dispositivo.
+- **Escucha como en los 90:** un reproductor opcional con la disposición clásica de 275×116 de los
+  reproductores de escritorio (tiempo grande, espectro, título que corre, kbps/kHz, volumen, balance,
+  barra de posición) y 20 temas de color originales. También lee **skins clásicos de Winamp 2 (.wsz)**
+  que cargas tú, por ejemplo del [Winamp Skin Museum](https://skins.webamp.org/): el archivo se lee en
+  el navegador y se guarda solo en ese dispositivo. No se incluyen skins de terceros.
 
 **Seis idiomas**
 - Español, English, Português, 中文, Русский y 日本語, según el navegador y cambiable con 🌐. Las

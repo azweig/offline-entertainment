@@ -828,7 +828,13 @@ function start(){
 addEventListener('offline', () => setOnline(false));
 addEventListener('online', recheck);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#top').hidden) recheck(); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  // hay una version nueva de la app: se recarga sola (si no esta descargando ni sonando nada)
+  const had = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!had || reloaded || busy || batchRunning || current) return; reloaded = true; location.reload(); });
+}
 store.init().then(refresh).then(async () => {
   const s = await ping();          // como mucho 2,5 s; sin red, al instante
   if (s === 'key') return showKey();

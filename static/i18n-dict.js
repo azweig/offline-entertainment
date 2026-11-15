@@ -206,6 +206,15 @@ en: {
 "Enlace bloqueado: apunta a una direccion privada o local": "Link blocked: it points to a private or local address",
 "No se pudo resolver {0}": "Couldn't resolve {0}",
 "Enlace no valido": "Invalid link",
+"Tus skins clásicos (.wsz)": "Your classic skins (.wsz)",
+"Descarga skins clásicos de Winamp 2 (archivos .wsz) en el Winamp Skin Museum y cárgalos aquí. Se guardan solo en este dispositivo.": "Download classic Winamp 2 skins (.wsz files) from the Winamp Skin Museum and load them here. They are saved only on this device.",
+"Cargar skin (.wsz)": "Load skin (.wsz)",
+"Temas incluidos": "Built-in themes",
+"¿Eliminar el skin «{0}»?": "Delete the skin “{0}”?",
+"Se borra de este dispositivo.": "It will be removed from this device.",
+"Eliminar": "Delete",
+"Ese archivo no parece un skin clásico (.wsz).": "That file doesn't look like a classic skin (.wsz).",
+"Elige un archivo .wsz de menos de 3 MB.": "Choose a .wsz file under 3 MB.",
 "noticias": "news"
 },
 pt: {
@@ -414,6 +423,15 @@ pt: {
 "Enlace bloqueado: apunta a una direccion privada o local": "Link bloqueado: aponta para um endereço privado ou local",
 "No se pudo resolver {0}": "Não foi possível resolver {0}",
 "Enlace no valido": "Link inválido",
+"Tus skins clásicos (.wsz)": "Suas skins clássicas (.wsz)",
+"Descarga skins clásicos de Winamp 2 (archivos .wsz) en el Winamp Skin Museum y cárgalos aquí. Se guardan solo en este dispositivo.": "Baixe skins clássicas do Winamp 2 (arquivos .wsz) no Winamp Skin Museum e carregue-as aqui. Elas ficam salvas só neste dispositivo.",
+"Cargar skin (.wsz)": "Carregar skin (.wsz)",
+"Temas incluidos": "Temas incluídos",
+"¿Eliminar el skin «{0}»?": "Excluir a skin «{0}»?",
+"Se borra de este dispositivo.": "Ela será apagada deste dispositivo.",
+"Eliminar": "Excluir",
+"Ese archivo no parece un skin clásico (.wsz).": "Esse arquivo não parece uma skin clássica (.wsz).",
+"Elige un archivo .wsz de menos de 3 MB.": "Escolha um arquivo .wsz com menos de 3 MB.",
 "noticias": "notícias"
 },
 zh: {
@@ -622,6 +640,15 @@ zh: {
 "Enlace bloqueado: apunta a una direccion privada o local": "链接已拦截：指向私有或本地地址",
 "No se pudo resolver {0}": "无法解析 {0}",
 "Enlace no valido": "链接无效",
+"Tus skins clásicos (.wsz)": "你的经典皮肤（.wsz）",
+"Descarga skins clásicos de Winamp 2 (archivos .wsz) en el Winamp Skin Museum y cárgalos aquí. Se guardan solo en este dispositivo.": "从 Winamp Skin Museum 下载经典的 Winamp 2 皮肤（.wsz 文件），然后在这里加载。皮肤只保存在此设备上。",
+"Cargar skin (.wsz)": "加载皮肤（.wsz）",
+"Temas incluidos": "内置主题",
+"¿Eliminar el skin «{0}»?": "删除皮肤「{0}」？",
+"Se borra de este dispositivo.": "它将从此设备上删除。",
+"Eliminar": "删除",
+"Ese archivo no parece un skin clásico (.wsz).": "这个文件看起来不是经典皮肤（.wsz）。",
+"Elige un archivo .wsz de menos de 3 MB.": "请选择小于 3 MB 的 .wsz 文件。",
 "noticias": "新闻"
 },
 ru: {
@@ -830,6 +857,15 @@ ru: {
 "Enlace bloqueado: apunta a una direccion privada o local": "Ссылка заблокирована: ведёт на частный или локальный адрес",
 "No se pudo resolver {0}": "Не удалось найти адрес {0}",
 "Enlace no valido": "Недействительная ссылка",
+"Tus skins clásicos (.wsz)": "Твои классические скины (.wsz)",
+"Descarga skins clásicos de Winamp 2 (archivos .wsz) en el Winamp Skin Museum y cárgalos aquí. Se guardan solo en este dispositivo.": "Скачай классические скины Winamp 2 (файлы .wsz) в Winamp Skin Museum и загрузи их сюда. Они хранятся только на этом устройстве.",
+"Cargar skin (.wsz)": "Загрузить скин (.wsz)",
+"Temas incluidos": "Встроенные темы",
+"¿Eliminar el skin «{0}»?": "Удалить скин «{0}»?",
+"Se borra de este dispositivo.": "Он будет удалён с этого устройства.",
+"Eliminar": "Удалить",
+"Ese archivo no parece un skin clásico (.wsz).": "Этот файл не похож на классический скин (.wsz).",
+"Elige un archivo .wsz de menos de 3 MB.": "Выбери файл .wsz меньше 3 МБ.",
 "noticias": "новости"
 },
 ja: {
@@ -1038,6 +1074,15 @@ ja: {
 "Enlace bloqueado: apunta a una direccion privada o local": "ブロックされたリンク：プライベートまたはローカルのアドレスを指しています",
 "No se pudo resolver {0}": "{0}を解決できませんでした",
 "Enlace no valido": "無効なリンクです",
+"Tus skins clásicos (.wsz)": "あなたのクラシックスキン（.wsz）",
+"Descarga skins clásicos de Winamp 2 (archivos .wsz) en el Winamp Skin Museum y cárgalos aquí. Se guardan solo en este dispositivo.": "Winamp Skin Museum からクラシックな Winamp 2 スキン（.wsz ファイル）をダウンロードして、ここで読み込んでください。この端末にだけ保存されます。",
+"Cargar skin (.wsz)": "スキンを読み込む（.wsz）",
+"Temas incluidos": "内蔵テーマ",
+"¿Eliminar el skin «{0}»?": "スキン「{0}」を削除しますか？",
+"Se borra de este dispositivo.": "この端末から削除されます。",
+"Eliminar": "削除",
+"Ese archivo no parece un skin clásico (.wsz).": "このファイルはクラシックスキン（.wsz）ではないようです。",
+"Elige un archivo .wsz de menos de 3 MB.": "3 MB 未満の .wsz ファイルを選んでください。",
 "noticias": "ニュース"
 }
 };

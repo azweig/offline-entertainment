@@ -84,8 +84,11 @@ No accounts. No central service. No middlemen. The server keeps nothing.
   lock-screen controls. Broken songs are skipped.
 - Your own playlists, a filter by playlist, and "download the missing ones".
 - Deleting anything asks for confirmation first.
-- **Listen like it's the 90s:** an optional retro player with an LCD display, scrolling title,
-  spectrum bars and 20 original color themes. It remembers your theme on each device.
+- **Listen like it's the 90s:** an optional player with the classic 275×116 desktop-player layout
+  (big time display, spectrum, scrolling title, kbps/kHz, volume, balance, seek bar) and 20 original
+  color themes. It also reads **classic Winamp 2 skins (.wsz)** that you load yourself, for example
+  from the [Winamp Skin Museum](https://skins.webamp.org/): the file is parsed in the browser and kept
+  only on that device. No third-party skins are bundled.
 
 **Six languages**
 - Español, English, Português, 中文, Русский and 日本語, picked from the browser and changeable with 🌐.
