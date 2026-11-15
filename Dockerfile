@@ -1,4 +1,4 @@
-FROM denoland/deno:bin-2.5.6 AS deno
+FROM denoland/deno:bin-2.9.8 AS deno
 
 FROM python:3.12-slim
 # ffmpeg: une audio+video y convierte a mp3. Deno: yt-dlp lo usa para resolver YouTube.
