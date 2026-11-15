@@ -511,7 +511,7 @@ def csp() -> str:
     hashes = " ".join("'sha256-" + base64.b64encode(hashlib.sha256(m.encode()).digest()).decode() + "'"
                       for m in re.findall(r"<script>(.*?)</script>", html, re.S))
     return ("default-src 'none'; script-src " + hashes + "; style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' https://i.ytimg.com data: blob:; media-src 'self' blob:; connect-src 'self'; "
+            "img-src 'self' https://i.ytimg.com data: blob:; media-src 'self' blob:; connect-src 'self' data:; "
             "worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 

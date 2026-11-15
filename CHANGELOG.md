@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Thumbnails of links from other sites (Facebook, TikTok, SoundCloud…) were not saved with the media:
+  the CSP blocked reading the `data:` image. `connect-src` now allows `data:`.
+
 ## [1.1.0] - 2026-11-15
 
 ### Added
