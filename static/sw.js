@@ -1,6 +1,6 @@
 // La app se abre SIEMPRE desde lo guardado en el celular (al instante, con o sin internet).
 // Si hay internet, se actualiza por detras y la version nueva se ve la proxima vez.
-const CACHE = 'offline-entertainment-v2';
+const CACHE = 'offline-entertainment-v3';
 const SHELL = ['./', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));

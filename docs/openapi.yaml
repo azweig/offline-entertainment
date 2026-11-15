@@ -234,14 +234,17 @@ paths:
   /api/jobs/{id}/file:
     get:
       tags: [jobs]
-      summary: Download the prepared file (single use; deleted right after)
+      summary: Download the prepared file (resumable; deleted once delivered complete)
       parameters:
         - $ref: "#/components/parameters/JobId"
+        - { name: Range, in: header, required: false, description: "Resume from byte N (only bytes=N- is supported)", schema: { type: string, pattern: "^bytes=\\d{1,12}-$" } }
       responses:
-        "200": { description: The file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "200": { description: The whole file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "206": { description: "The rest of the file, from byte N", headers: { Content-Range: { schema: { type: string } } }, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "416": { description: "N is at or past the end of the file", headers: { Content-Range: { schema: { type: string } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: "Not ready, or already being delivered", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: "Not ready, or another transfer of it is in progress", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
 
 components:
   securitySchemes:

@@ -194,7 +194,7 @@ const store = {
         if (h.kind !== 'file' || name.startsWith('.') || name.endsWith('.crswap')) continue;
         const f = await h.getFile(); out.push({name, size: f.size, mtime: f.lastModified});
       }
-    } else for (const r of await this.tx('readonly', s => s.getAll())) out.push({name: r.name, size: r.size, mtime: r.mtime});
+    } else for (const r of await this.tx('readonly', s => s.getAll())) if (!r.name.startsWith('.')) out.push({name: r.name, size: r.size, mtime: r.mtime});
     return out.sort((a, b) => b.mtime - a.mtime);
   },
   async blob(name){
@@ -205,6 +205,47 @@ const store = {
     return (await this.tx('readonly', s => s.get(name))).blob;
   },
   async remove(name){ try { if (this.mode === 'opfs') await this.root.removeEntry(name); else await this.tx('readwrite', s => s.delete(name)); } catch {} },
+  // ---- descargas que se pueden retomar: lo recibido se guarda en trozos de 8 MB ya confirmados
+  // (".part-<trabajo>-<n>"). Si el celular congela la app, al volver se pide solo lo que falta.
+  async names(){
+    if (this.mode === 'opfs'){ const o = []; for await (const [n, h] of this.root.entries()) if (h.kind === 'file') o.push(n); return o; }
+    return (await this.tx('readonly', s => s.getAllKeys())) || [];
+  },
+  async parts(job){
+    const pre = `.part-${job}-`, out = [];
+    for (const n of await this.names()) if (n.startsWith(pre)) out.push(n);
+    out.sort((a, b) => +a.slice(pre.length) - +b.slice(pre.length));
+    let size = 0; for (const n of out) size += (await this.blob(n)).size;
+    return {names: out, size};
+  },
+  async putBlob(name, blob){
+    if (this.mode === 'opfs'){ const w = await (await this.root.getFileHandle(name, {create: true})).createWritable(); await w.write(blob); await w.close(); }
+    else await this.tx('readwrite', s => s.put({name, size: blob.size, mtime: Date.now(), blob}));
+  },
+  async dropParts(job){ for (const n of await this.names()) if (n.startsWith(job ? `.part-${job}-` : '.part-')) await this.remove(n); },
+  async receive(job, name, response, offset, total, onProgress){
+    const reader = response.body.getReader();
+    let {names} = await this.parts(job), idx = names.length, buf = [], bufLen = 0, done = offset;
+    const flush = async () => { if (!bufLen) return; await this.putBlob(`.part-${job}-${idx++}`, new Blob(buf)); buf = []; bufLen = 0; };
+    try {
+      for(;;){ const {value, done: end} = await reader.read(); if (end) break;
+        buf.push(value); bufLen += value.length; done += value.length; onProgress(total ? done * 100 / total : 0);
+        if (bufLen >= 8e6) await flush(); }
+    } finally { await flush().catch(() => {}); }        // aunque se corte, lo recibido queda confirmado
+    if (total && done !== total) throw new Error('Transferencia incompleta');
+    const p = await this.parts(job);
+    if (total && p.size !== total) throw new Error('Transferencia incompleta');
+    const type = MIME[name.split('.').pop().toLowerCase()] || '';
+    if (this.mode === 'opfs'){
+      const w = await (await this.root.getFileHandle(name, {create: true})).createWritable();
+      try { for (const n of p.names) await w.write(await this.blob(n)); await w.close(); }
+      catch (e) { try { await w.abort(); } catch {} throw e; }
+    } else {
+      const blobs = []; for (const n of p.names) blobs.push(await this.blob(n));
+      await this.putBlob(name, new Blob(blobs, {type}));
+    }
+    await this.dropParts(job);
+  },
 };
 
 // ---------- servidor
@@ -414,17 +455,46 @@ $('#scrim').onclick = e => { if (e.target === $('#scrim')) $('#scrim').classList
 
 // ---------- descarga de un video (comun a la cola simple y a las playlists)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function downloadOne(v, mode, quality, set){
-  let r = await api('api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: v.id, url: v.url, mode, quality})});
-  let j = await r.json(); if (!r.ok){ const e = new Error(j.error); e.retry = j.retry; throw e; }
+const visible = () => new Promise(ok => { if (!document.hidden) return ok();
+  const f = () => { if (!document.hidden){ document.removeEventListener('visibilitychange', f); ok(); } }; document.addEventListener('visibilitychange', f); });
+// Pide al servidor que prepare (o reusa lo que ya preparo: st.job sobrevive aunque cierres la app)
+async function startJob(v, mode, quality, st, save = () => {}){
+  if (st.job){
+    const r = await api('api/jobs/' + st.job);
+    if (r.ok) return r.json();
+    await store.dropParts(st.job); st.job = null; save();        // vencio en el servidor: se empieza de nuevo
+  }
+  const r = await api('api/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: v.id, url: v.url, mode, quality})});
+  const j = await r.json(); if (!r.ok){ const e = new Error(j.error); e.retry = j.retry; throw e; }
+  st.job = j.id; save(); return j;
+}
+async function downloadOne(v, mode, quality, set, st = {}, save = () => {}){
+  let j = await startJob(v, mode, quality, st, save), r;
   while (!['listo','error'].includes(j.status)){
     await sleep(1000);
-    r = await api('api/jobs/' + j.id); j = await r.json(); if (!r.ok) throw new Error(j.error);
+    r = await api('api/jobs/' + j.id); j = await r.json(); if (!r.ok){ st.job = null; save(); throw new Error(j.error); }
     set(j.status === 'descargando' ? `Preparando… ${j.progress}%` : 'Preparando…', j.progress / 2);
   }
-  if (j.status === 'error') throw new Error(j.error);
-  r = await api(`api/jobs/${j.id}/file`); if (!r.ok) throw new Error((await r.json()).error);
-  await store.save(j.filename, r, p => set(`Guardando… ${Math.round(p)}%`, 50 + p / 2));
+  if (j.status === 'error'){ st.job = null; save(); throw new Error(j.error); }
+  // traer el archivo; si se corta (saliste de la app, se fue la señal) se retoma donde quedo
+  for (let tries = 0; ; tries++){
+    const have = (await store.parts(j.id)).size;
+    try {
+      r = await api(`api/jobs/${j.id}/file`, have ? {headers: {Range: `bytes=${have}-`}} : {});
+      if (r.status === 409 && tries < 20){ set('Retomando…'); await sleep(4000); continue; }   // la conexion vieja aun no se cerro
+      if (r.status === 416 && have){ await store.dropParts(j.id); continue; }   // lo guardado no cuadra: de cero
+      if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).error || 'No disponible'), {fatal: true});
+      const offset = r.status === 206 ? have : 0;
+      if (!offset && have) await store.dropParts(j.id);
+      await store.receive(j.id, j.filename, r, offset, j.size, p => set(`Guardando… ${Math.round(p)}%`, 50 + p / 2));
+      break;
+    } catch (e) {
+      if (e.fatal || tries >= 30){ await store.dropParts(j.id); st.job = null; save(); throw e; }
+      set(document.hidden ? 'En pausa: vuelve a la app para seguir' : 'Se cortó, retomando…');
+      await visible(); await sleep(1500);
+    }
+  }
+  st.job = null; save();
   if (v.id) try { const t = await api('api/thumb?id=' + encodeURIComponent(v.id)); if (t.ok) await store.save(j.filename + '.thumb', t); } catch {}
   else if ((v.thumb || '').startsWith('data:image/')) try { await store.save(j.filename + '.thumb', await fetch(v.thumb)); } catch {}
   await refresh();
@@ -437,12 +507,14 @@ function enqueue(v, mode, quality){
   el.innerHTML = `<div class="t">${esc(v.title)}</div><div class="ch">En cola…</div><div class="pb"><i style="width:0"></i></div>`;
   $('#queue').append(el);
   const set = (txt, pct) => { el.children[1].textContent = txt; if (pct != null) el.querySelector('i').style.width = pct + '%'; };
+  busy++; keepAwake();
   chain = chain.then(async () => {
     try {
       await downloadOne(v, mode, quality, set);
       set('Guardado. Ya puedes verlo sin conexión.', 100); el.querySelector('i').style.background = 'var(--ok)';
       setTimeout(() => el.remove(), 3500);
     } catch (err) { el.classList.add('err'); set('No se pudo: ' + err.message); el.onclick = () => el.remove(); setTimeout(() => el.remove(), 15000); }
+    finally { busy--; keepAwake(); }
   });
 }
 
@@ -459,9 +531,23 @@ function addBatch(title, items){
   const add = items.filter(x => !have.has(x.id) && !inq.has(x.id)).map(x => ({id: x.id, title: x.title}));
   batch.items.push(...add); saveBatch(); runBatch(); return add.length;
 }
+// pantalla encendida mientras hay descargas (si se apaga, el celular congela la app)
+let busy = 0, wakeLock = null;
+async function keepAwake(){
+  try {
+    if ((busy || batchRunning) && !document.hidden){ if (!wakeLock && navigator.wakeLock){ wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } }
+    else if (wakeLock){ const w = wakeLock; wakeLock = null; await w.release(); }
+  } catch {}
+}
+document.addEventListener('visibilitychange', keepAwake);
+// el servidor va preparando el siguiente mientras se guarda el actual
+async function prepNext(){
+  const it = batch && batch.items[1]; if (!it || it.job) return;
+  try { await startJob({...it, url: `https://www.youtube.com/watch?v=${it.id}`}, 'audio', '480', it, saveBatch); } catch {}
+}
 async function runBatch(){
   if (batchRunning || !batch || !batch.items.length || !online) return;
-  batchRunning = true;
+  batchRunning = true; keepAwake();
   if (!batchEl){ batchEl = document.createElement('div'); batchEl.className = 'q';
     batchEl.innerHTML = `<div class="t"></div><div class="ch"></div><div class="pb"><i style="width:0"></i></div><button class="more">Detener</button>`;
     $('#queue').prepend(batchEl);
@@ -471,8 +557,10 @@ async function runBatch(){
     const it = batch.items[0], total = batch.done + batch.fail + batch.items.length;
     t.textContent = `${batch.title}: ${batch.done + batch.fail + 1} de ${total}`;
     try {
+      let prepped = false;
       await downloadOne({...it, url: `https://www.youtube.com/watch?v=${it.id}`}, 'audio', '480',
-        (txt, pct) => { c.textContent = `${it.title} — ${txt}`; if (pct != null) bar.style.width = pct + '%'; });
+        (txt, pct) => { c.textContent = `${it.title} — ${txt}`; if (pct != null) bar.style.width = pct + '%';
+          if (!prepped && txt.startsWith('Guardando')){ prepped = true; prepNext(); } }, it, saveBatch);
       batch.done++;
     } catch (e) {
       if (e.retry && batch.items.length){ c.textContent = e.retry > 60 ? `Límite por hora alcanzado: sigue sola en ${Math.round(e.retry / 60)} min…` : 'Esperando turno en el servidor…'; await sleep(e.retry * 1000); continue; }
@@ -481,7 +569,7 @@ async function runBatch(){
     }
     batch.items.shift(); saveBatch();
   }
-  batchRunning = false;
+  batchRunning = false; keepAwake();
   if (batch && batch.items.length){ c.textContent = 'En pausa: sin conexión. Sigue sola cuando vuelva internet.'; return; }
   if (batch){ t.textContent = `${batch.title}: listo`; c.textContent = `${batch.done} guardadas${batch.fail ? ` · ${batch.fail} no se pudieron (borradas o bloqueadas)` : ''}.`; bar.style.width = '100%'; bar.style.background = 'var(--ok)'; }
   const el = batchEl; batch = null; batchEl = null; saveBatch(); setTimeout(() => el.remove(), 8000);
@@ -683,6 +771,9 @@ function setOnline(v){
 }
 async function recheck(){ const s = await ping(); if (s === 'key') return showKey(); setOnline(s === 'on'); }
 function start(){
+  // trozos de descargas que ya no estan en la cola (p. ej. una suelta que se corto y cerraste la app)
+  const keep = new Set((batch?.items || []).map(x => x.job).filter(Boolean));
+  store.names().then(ns => { for (const n of ns){ const m = n.match(/^\.part-([0-9a-f]{16})-/); if (m && !keep.has(m[1])) store.remove(n); } }).catch(() => {});
   $('#top').hidden = false;
   $('#net').textContent = online ? 'en línea' : 'sin conexión'; $('#net').classList.toggle('off', !online); $('#q').hidden = !online;
   go(online ? 'inicio' : 'descargas');

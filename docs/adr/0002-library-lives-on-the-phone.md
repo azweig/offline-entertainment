@@ -9,9 +9,10 @@ Keeping a second copy on the server would add a database, disk usage, backups an
 someone watched.
 
 ## Decision
-The server prepares each file in a private temp folder, streams it **once** and deletes it in a
-`finally` block, whether the transfer completed or not. Files nobody collects are removed after
-20 minutes; each run uses a new private temp folder that is removed on exit. The phone stores media in OPFS (IndexedDB
+The server prepares each file in a private temp folder, streams it to the phone and deletes it as
+soon as the last byte is sent. An interrupted transfer keeps the file for up to 60 minutes so the
+phone can resume it (see [ADR 0006](0006-resumable-downloads.md)). Files nobody collects are removed
+after 60 minutes; each run uses a new private temp folder that is removed on exit. The phone stores media in OPFS (IndexedDB
 fallback) and asks for persistent storage. Playlists and preferences live in `localStorage`.
 
 ## Consequences

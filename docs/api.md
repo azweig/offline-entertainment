@@ -28,7 +28,7 @@ A machine-readable version is in [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1); y
 | GET | `/api/thumb` | A YouTube thumbnail, fetched through the server |
 | POST | `/api/jobs` | Start preparing a file |
 | GET | `/api/jobs/{id}` | Job progress |
-| GET | `/api/jobs/{id}/file` | Download the file (once) |
+| GET | `/api/jobs/{id}/file` | Download the file (resumable with `Range`) |
 
 Static, unauthenticated: `/`, `/index.html`, `/sw.js`, `/manifest.webmanifest`, `/icon.svg`,
 `/icon-192.png`, `/icon-512.png`, `/apple-touch-icon.png`. Anything else is `404`.
@@ -128,9 +128,16 @@ running (retry after the given seconds).
 `id`: 16 lowercase hex chars. `200 Job` · `404` unknown or already delivered/expired.
 
 ### `GET /api/jobs/{id}/file`
-`200 application/octet-stream` with `Content-Length`. **Single use:** the first request that finds
-the job `listo` gets the file; the file and the job are deleted when the response ends, even if the
-transfer was interrupted. A concurrent or later request gets `409 {"error": "no disponible"}` or `404`.
+`200 application/octet-stream` with `Content-Length` and `Accept-Ranges: bytes`.
+
+- **Resumable:** send `Range: bytes=N-` to get the rest from byte `N` → `206` with
+  `Content-Range: bytes N-(size-1)/size`. `N` at or past the end → `416` with `Content-Range: bytes */size`.
+  Only the open-ended form `bytes=N-` is supported.
+- **Deleted once delivered:** when a response reaches the last byte, the file and the job are deleted.
+  If the transfer is interrupted, the file stays for another 60 minutes (`TTL`) so the client can resume.
+- **One transfer at a time:** while a transfer is in progress, other requests get
+  `409 {"error": "no disponible"}`; retry once it has ended. A connection that stops reading is
+  dropped after 60 s. Unknown, delivered or expired jobs → `404`.
 
 ## Example: save a song with curl
 

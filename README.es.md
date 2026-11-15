@@ -181,9 +181,10 @@ sequenceDiagram
 
 1. El celular le pide un archivo a tu servidor, con tu clave.
 2. El servidor lo prepara con yt-dlp y ffmpeg en una carpeta temporal.
-3. Lo envía **una vez** y lo **borra al instante**, haya llegado completo o no. Lo que nadie retira en
-   20 minutos se borra solo, y cada arranque usa una carpeta temporal nueva y privada que se borra
-   al apagar el servidor.
+3. Lo envía al celular y lo **borra apenas llegó completo**. Si la transferencia se corta (cambiaste
+   de app, se fue la señal), el celular guarda lo que ya recibió y al volver pide solo lo que falta.
+   Lo que nadie retira en 60 minutos se borra solo, y cada arranque usa una carpeta temporal nueva y
+   privada que se borra al apagar el servidor.
 4. El celular guarda el archivo en su propio almacenamiento. El service worker guarda la app, así que
    abre sin conexión.
 

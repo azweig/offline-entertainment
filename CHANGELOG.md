@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-15
+
+### Added
+- Resumable downloads: `GET /api/jobs/{id}/file` accepts `Range: bytes=N-` (`206`/`416`). The phone
+  saves confirmed 8 MB parts and, after switching apps or losing signal, asks only for the rest.
+- Playlist batches prepare the next song on the server while the current one is being saved.
+- Screen Wake Lock while downloading, so the phone does not freeze the app by itself.
+- [ADR 0006](docs/adr/0006-resumable-downloads.md).
+
+### Changed
+- A file is deleted once it has arrived complete; an interrupted transfer keeps it for up to
+  60 minutes (`TTL` 20 → 60 min). Stalled transfers are dropped after 60 s.
+
 ## [1.0.0] - 2026-11-15
 
 ### Added
@@ -31,6 +44,7 @@ All notable changes to this project are documented here. The format follows
   DNS resolution with private-network blocking before every connection.
 - Docker image (non-root, no logs), `start.sh` / `start.bat`, English and Spanish READMEs.
 
-[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/azweig/offline-entertainment/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/azweig/offline-entertainment/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/azweig/offline-entertainment/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/azweig/offline-entertainment/releases/tag/v0.1.0

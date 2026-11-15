@@ -73,7 +73,7 @@ flowchart LR
 | T10 | XSS from titles/descriptions of remote content | Tampering | `esc()` / `textContent` everywhere; strict CSP with script hash; thumbnails as checked `data:` URIs | ✅ Mitigated |
 | T11 | Clickjacking | Tampering | `frame-ancestors 'none'`, `X-Frame-Options: DENY` | ✅ Mitigated |
 | T12 | Exhaust threads with idle connections (slowloris) | Denial of service | 15 s request timeout, max 64 simultaneous connections | ⚠️ Reduced (see residual risks) |
-| T13 | Fill the disk | Denial of service | 1.2 GB per job counting every stream and fragment, 2 jobs, 3 GB free-space floor, 20 min pick-up, temp dir removed on exit | ✅ Mitigated |
+| T13 | Fill the disk | Denial of service | 1.2 GB per job counting every stream and fragment, 2 jobs, 3 GB free-space floor, 60 min pick-up/resume window, 60 s stalled-transfer timeout, temp dir removed on exit | ✅ Mitigated |
 | T14 | Runaway jobs | Denial of service | 3 h limit enforced inside the download; the 2-job limit counts live threads | ✅ Mitigated |
 | T15 | Another local user hijacks the temp dir | Tampering | New `mkdtemp` folder (0700) per run | ✅ Mitigated |
 | T16 | Server keeps a record of what was watched | Information disclosure | No database, history or logs; files deleted on delivery | ✅ Mitigated |

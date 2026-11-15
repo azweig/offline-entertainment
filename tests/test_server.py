@@ -248,5 +248,76 @@ class Hardening(Auth):   # reusa el servidor de prueba de Auth
             self.assertIn("allowed_extractors", inspect.getsource(fn), fn.__name__)
 
 
+class Resume(Auth):   # reusa el servidor de prueba de Auth
+    """Descargas que se pueden retomar: Range, el archivo queda si se corta y se borra al entregarlo entero."""
+
+    def job(self, data: bytes) -> str:
+        import secrets, time
+        jid = secrets.token_hex(8)
+        (server.TMP_ROOT / jid).mkdir(parents=True)
+        (server.TMP_ROOT / jid / "v.mp4").write_bytes(data)
+        server.JOBS[jid] = {"id": jid, "status": "listo", "created": time.time(), "done": time.time(),
+                            "filename": "v.mp4", "size": len(data)}
+        return jid
+
+    def get(self, jid, rng=None):
+        h = {"X-Key": KEY, **({"Range": rng} if rng else {})}
+        try:
+            with urlopen(Request(f"{self.base}/api/jobs/{jid}/file", headers=h), timeout=5) as r:
+                return r.status, dict(r.headers), r.read()
+        except HTTPError as e:
+            with e:
+                return e.code, dict(e.headers), e.read()
+
+    def wait_gone(self, jid):
+        import time
+        for _ in range(50):
+            if jid not in server.JOBS:
+                return True
+            time.sleep(0.02)
+        return False
+
+    def test_retoma_desde_el_byte_pedido(self):
+        data = os.urandom(700_000)
+        jid = self.job(data)
+        st, h, body = self.get(jid, "bytes=300000-")
+        self.assertEqual(st, 206)
+        self.assertEqual(h["Content-Range"], f"bytes 300000-{len(data) - 1}/{len(data)}")
+        self.assertEqual(body, data[300000:])
+        self.assertTrue(self.wait_gone(jid))   # entregado entero: se borra
+
+    def test_corte_deja_el_archivo_para_retomar(self):
+        import time
+        data = os.urandom(4_000_000)
+        jid = self.job(data)
+        host, port = self.srv.server_address
+        with socket.create_connection((host, port), timeout=5) as c:
+            c.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+            c.sendall(f"GET /api/jobs/{jid}/file HTTP/1.1\r\nHost: x\r\nX-Key: {KEY}\r\n\r\n".encode())
+            c.recv(1024)
+            c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, __import__("struct").pack("ii", 1, 0))
+        for _ in range(100):
+            if not server.JOBS[jid].get("sending"):
+                break
+            time.sleep(0.05)
+        self.assertFalse(server.JOBS[jid].get("sending"))
+        self.assertTrue((server.TMP_ROOT / jid / "v.mp4").exists())
+        st, _, body = self.get(jid, "bytes=1000-")
+        self.assertEqual((st, body), (206, data[1000:]))
+        self.assertTrue(self.wait_gone(jid))
+
+    def test_rango_fuera_de_tamano_416(self):
+        jid = self.job(b"x" * 10)
+        st, h, _ = self.get(jid, "bytes=10-")
+        self.assertEqual((st, h["Content-Range"]), (416, "bytes */10"))
+        server.wipe(jid)
+
+    def test_sin_range_200_completo(self):
+        data = os.urandom(1000)
+        jid = self.job(data)
+        st, h, body = self.get(jid)
+        self.assertEqual((st, body, h["Accept-Ranges"]), (200, data, "bytes"))
+
+
 if __name__ == "__main__":
     unittest.main()

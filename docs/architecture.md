@@ -81,7 +81,7 @@ flowchart LR
 | `static/index.html` | HTML + CSS + vanilla JS | Search, info sheet, download queue, library, music player, offline mode |
 | `static/sw.js` | Service Worker | Stale-while-revalidate cache of the app shell; never caches `/api/` |
 | Browser storage | OPFS (IndexedDB fallback), localStorage | The user's library and preferences. The only persistent copy of media. |
-| `server.py` | Python 3.11+ stdlib `http.server` | Auth, input validation, link guard, job orchestration, one-time file delivery |
+| `server.py` | Python 3.11+ stdlib `http.server` | Auth, input validation, link guard, job orchestration, resumable file delivery |
 | yt-dlp + ffmpeg + Deno | Libraries / binaries | Extraction, download, remux to H.264 MP4 or convert to MP3 |
 
 ## 4. Server components (C4 level 3)
@@ -189,7 +189,7 @@ classDiagram
         +JOBS: dict
         +MAX_ACTIVE = 2
         +MAX_FILESIZE = 1.2 GB
-        +TTL = 20 min
+        +TTL = 60 min
         +run(job_id, url, mode, quality, ies)
         +options(job_id, mode, quality, ies) dict
         +wipe(job_id)
@@ -357,11 +357,17 @@ sequenceDiagram
         P->>H: GET /api/jobs/{id}
         H-->>P: {status, progress}
     end
-    P->>H: GET /api/jobs/{id}/file
-    H->>H: mark "sending" under LOCK (only one download ever)
-    H-->>P: application/octet-stream (streamed in 256 KB chunks)
-    H->>H: wipe(job_id) in finally: deleted even if the transfer broke
-    P->>P: Store.save(): OPFS write, verify length, then thumbnail
+    P->>H: GET /api/jobs/{id}/file  (Range: bytes=N- if parts are already saved)
+    H->>H: mark "sending" under LOCK (one transfer at a time, else 409)
+    H-->>P: 200 or 206 application/octet-stream (256 KB chunks)
+    P->>P: Store.receive(): confirmed 8 MB parts (.part-<job>-<n>)
+    alt last byte sent
+        H->>H: wipe(job_id): file and job deleted
+        P->>P: join the parts into the final file, verify size, then thumbnail
+    else cut (app in background, signal lost)
+        H->>H: keep the file, clear "sending", TTL restarts
+        P->>P: when visible again: ask Range bytes=(saved)-
+    end
 ```
 
 ### 6.3 Link from another site (preview before saving)
@@ -423,10 +429,11 @@ stateDiagram-v2
     descargando --> error: site error, > 1.2 GB
     procesando --> listo: file ready
     procesando --> error
-    listo --> enviando: GET /file (first and only time)
-    enviando --> [*]: wipe() in finally (complete or not)
-    listo --> [*]: janitor, not picked up in 20 min
-    error --> [*]: janitor, 20 min after failure
+    listo --> enviando: GET /file (Range bytes=N- to resume)
+    enviando --> [*]: wipe() after the last byte
+    enviando --> listo: transfer cut (file kept, TTL restarts)
+    listo --> [*]: janitor, not collected in 60 min
+    error --> [*]: janitor, 60 min after failure
     descargando --> [*]: janitor, still working after 3 h
 ```
 
@@ -438,7 +445,7 @@ States are the Spanish strings the API returns: `en cola` (queued), `descargando
 | Data | Where | Lifetime | Who can read it |
 |---|---|---|---|
 | Key | Server: `OFFLINE_KEY` or key file (0600). Phone: `localStorage['vk']` | Until you change it | You |
-| Media being prepared | Server temp dir `offline-entertainment-XXXX/<job>` (new per run, 0700) | Until delivered, max 20 min after ready, max 3 h working; removed when the server stops | Server process |
+| Media being prepared | Server temp dir `offline-entertainment-XXXX/<job>` (new per run, 0700) | Until delivered complete, max 60 min after ready or after a cut transfer, max 3 h working; removed when the server stops | Server process |
 | Job metadata | Server memory (`JOBS`) | Same as above | Server process |
 | Search / list / info results | Server memory (`CACHE`) | 6 h, max 3000 entries, lost on restart | Server process |
 | Saved media + thumbnails | Phone: OPFS (`navigator.storage.getDirectory()`) or IndexedDB `offline-entertainment/files` | Until you delete it (persistent storage requested) | Only that browser profile |
@@ -508,7 +515,8 @@ recommended security headers. Keep the server bound to `127.0.0.1` and let only 
 | Concurrent downloads | 2 (`MAX_ACTIVE`), extra requests get `429` with `retry: 10` | `do_POST` |
 | File size | 1.2 GB (`MAX_FILESIZE`, enforced by yt-dlp) | `options()` |
 | Job working time | 3 h (`MAX_WORK`) | `janitor()` |
-| Pick-up window | 20 min after ready/failed (`TTL`) | `janitor()` |
+| Pick-up / resume window | 60 min after ready, failed or cut (`TTL`) | `janitor()` |
+| Stalled transfer | 60 s without the client reading | file handler |
 | Playlist / channel size | 200 items (`MAX_LIST`) | `list_items()` |
 | Search results | 24 (40 when sorting by date) | `do_GET`, `search()` |
 | Request body | < 5000 bytes, JSON | `do_POST` |
@@ -547,3 +555,4 @@ Recorded as short Architecture Decision Records in [`docs/adr/`](adr/):
 | [0003](adr/0003-extractor-allowlist-and-dns-guard.md) | Closed site allowlist, exact extractors and a DNS guard against private networks |
 | [0004](adr/0004-mandatory-key-in-url-fragment.md) | A key is always required; it is handed over in the URL fragment |
 | [0005](adr/0005-no-accounts-cookies-or-evasion.md) | No accounts, cookies, proxies or block evasion |
+| [0006](adr/0006-resumable-downloads.md) | Resumable downloads (HTTP Range + confirmed parts on the phone) |

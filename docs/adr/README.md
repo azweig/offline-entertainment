@@ -11,3 +11,4 @@ To change one, add a new ADR that supersedes it.
 | [0003](0003-extractor-allowlist-and-dns-guard.md) | Closed site allowlist, exact extractors and a DNS guard | Accepted |
 | [0004](0004-mandatory-key-in-url-fragment.md) | A key is always required, handed over in the URL fragment | Accepted |
 | [0005](0005-no-accounts-cookies-or-evasion.md) | No accounts, cookies, proxies or block evasion | Accepted |
+| [0006](0006-resumable-downloads.md) | Resumable downloads | Accepted |

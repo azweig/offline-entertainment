@@ -41,8 +41,13 @@ close it and open it again.
 
 **Port 8765 is busy.** `make run PORT=8790` or `python server.py --port 8790`.
 
-**Does the server keep my files?** No. Each file is deleted right after it is sent, files nobody picks
-up are deleted after 20 minutes, and the private temp folder is removed when the server stops.
+**Does the server keep my files?** No. Each file is deleted as soon as it has arrived complete. If a
+transfer is cut, it is kept for up to 60 minutes so the phone can resume; files nobody picks up are
+deleted after 60 minutes, and the private temp folder is removed when the server stops.
+
+**A download stopped when I switched apps.** Phones freeze web apps in the background (iPhone always,
+Android after a while). What arrived is kept; open the app again within an hour and it continues from
+there. While downloading, the app keeps the screen on so it does not freeze by itself.
 
 **Can I see what was downloaded?** No. There are no logs or history by design.
 

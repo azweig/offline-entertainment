@@ -178,9 +178,10 @@ sequenceDiagram
 
 1. The phone asks your server for a file, sending your key.
 2. The server prepares it with yt-dlp and ffmpeg in a temporary folder.
-3. It is sent **once** and **deleted right away**, whether it arrived complete or not. Anything nobody
-   picks up within 20 minutes is deleted, and each run uses a new private temp folder that is
-   removed when the server stops.
+3. It is sent to the phone and **deleted as soon as it has arrived complete**. If the transfer is
+   cut (you switched apps, the signal dropped), the phone keeps what it received and asks only for
+   the rest when you come back. Anything not collected within 60 minutes is deleted, and each run
+   uses a new private temp folder that is removed when the server stops.
 4. The phone keeps the file in its own storage. The service worker keeps the app itself, so it
    opens without a connection.
 

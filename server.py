@@ -28,7 +28,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 # main() lo reemplaza por una carpeta nueva y privada (mkdtemp, 0700): nadie puede adueñarse de ella antes
 TMP_ROOT = Path(tempfile.gettempdir()) / "offline-entertainment-tmp"
 KEY = ""   # se carga en main() con load_key()
-TTL = 20 * 60
+TTL = 60 * 60   # una hora para retirar (o retomar) un archivo listo
 MAX_ACTIVE = 2
 MAX_FILESIZE = 1_200_000_000   # bytes por archivo: unico tope de tamano (sin limite de duracion)
 MAX_WORK = 3 * 3600            # una descarga que sigue trabajando tras 3 h se descarta
@@ -683,20 +683,43 @@ class H(BaseHTTPRequestHandler):
             return self.js(public(j))
         if not sending:
             return self.js({"error": "no disponible"}, 409)
-        f = TMP_ROOT / job_id / j["filename"]
+        f, size = TMP_ROOT / job_id / j["filename"], j["size"]
+        # Retomar: "Range: bytes=N-" manda desde el byte N (el celular guarda lo que ya recibio)
+        rm = re.fullmatch(r"bytes=(\d{1,12})-", (self.headers.get("Range") or "").strip())
+        start = int(rm.group(1)) if rm else 0
+        complete = False
         try:
-            self.send_response(200)
+            if start >= size > 0:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(206 if start else 200)
             self.send_header("Content-Type", "application/octet-stream")
-            self.send_header("Content-Length", str(j["size"]))
+            self.send_header("Content-Length", str(size - start))
+            if start:
+                self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
+            self.send_header("Accept-Ranges", "bytes")
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
+            # un celular congelado (app en segundo plano) no puede retener la conexion para siempre
+            self.connection.settimeout(60)
             with f.open("rb") as fh:
+                fh.seek(start)
                 while chunk := fh.read(256 * 1024):
                     self.wfile.write(chunk)
-        except (BrokenPipeError, ConnectionResetError):
+            self.wfile.flush()
+            complete = True
+        except OSError:   # se corto (BrokenPipe, reset, timeout): el archivo queda para retomar
             pass
         finally:
-            wipe(job_id)  # se borra siempre, haya llegado completo o no
+            if complete:
+                wipe(job_id)   # entregado entero: se borra
+            else:
+                with LOCK:
+                    if job_id in JOBS:
+                        JOBS[job_id].update(sending=False, done=time.time())   # TTL para volver
 
     def do_POST(self):
         if urlparse(self.path).path != "/api/jobs":
