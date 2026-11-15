@@ -15,15 +15,17 @@ para verlos sin conexion (YouTube, Facebook, Instagram, TikTok y mas).
 
 Uso:  python server.py [--port 8765] [--host 127.0.0.1]
 """
-import argparse, base64, hmac, ipaddress, json, mimetypes, os, re, secrets, shutil, socket, sys, tempfile, threading, time, uuid
+import argparse, base64, hashlib, hmac, ipaddress, json, mimetypes, os, re, secrets, shutil, signal, socket, stat, sys
+import tempfile, threading, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, quote
-from urllib.request import urlopen
+from urllib.request import HTTPRedirectHandler, build_opener
 
 import yt_dlp
 
 STATIC = Path(__file__).resolve().parent / "static"
+# main() lo reemplaza por una carpeta nueva y privada (mkdtemp, 0700): nadie puede adueñarse de ella antes
 TMP_ROOT = Path(tempfile.gettempdir()) / "offline-entertainment-tmp"
 KEY = ""   # se carga en main() con load_key()
 TTL = 20 * 60
@@ -31,6 +33,12 @@ MAX_ACTIVE = 2
 MAX_FILESIZE = 1_200_000_000   # bytes por archivo: unico tope de tamano (sin limite de duracion)
 MAX_WORK = 3 * 3600            # una descarga que sigue trabajando tras 3 h se descarta
 MAX_LIST = 200   # canciones por playlist/canal
+MIN_FREE = 3_000_000_000       # no se acepta una descarga si quedan menos de 3 GB libres
+MAX_CONN = 64                  # conexiones simultaneas; el resto se cierra
+REQ_TIMEOUT = 15               # segundos para mandar cada pedido (evita conexiones colgadas)
+FAIL_LIMIT = (20, 600)         # 20 claves malas en 10 min desde una IP -> 429 hasta que pase la ventana
+YT_IES = ["youtube.*"]         # extractores para busquedas y listas: solo los de YouTube
+HOST_RE = re.compile(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
 YT_ID = re.compile(r"[\w-]{11}")
 YT_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
             "youtu.be", "www.youtube-nocookie.com", "youtube-nocookie.com"}
@@ -64,8 +72,14 @@ def site_link(raw: str) -> tuple[str, list[str], str] | None:
         port = u.port
     except ValueError:
         return None
+    # La parte del servidor solo puede tener letras, numeros, guiones y puntos. Una barra invertida
+    # (https://localhost\x.bandcamp.com) haria que Python y la libreria HTTP lean hosts distintos.
+    if any(c in u.netloc for c in "\\%@ \t\r\n"):
+        return None
     host = (u.hostname or "").lower().rstrip(".")
     if u.scheme not in ("http", "https") or u.username or u.password or port not in (None, 80, 443):
+        return None
+    if not HOST_RE.fullmatch(host):
         return None
     for name, domains, ies in SITES:
         if any(host == d or host.endswith("." + d) for d in domains):
@@ -112,7 +126,8 @@ def youtube_id(raw: str) -> str | None:
 
 BLOCKED_NETS = [ipaddress.ip_network(n) for n in (
     "0.0.0.0/8", "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
-    "169.254.0.0/16", "100.64.0.0/10", "::/128", "::1/128", "fc00::/7", "fe80::/10")]
+    "169.254.0.0/16", "100.64.0.0/10", "::/128", "::1/128", "fc00::/7", "fe80::/10",
+    "fec0::/10", "64:ff9b::/96", "64:ff9b:1::/48", "2002::/16")]   # site-local, NAT64 y 6to4 (llevan IPv4 adentro)
 
 
 def blocked_ip(addr: str) -> bool:
@@ -142,6 +157,21 @@ def check_url(url: str) -> str:
     return url
 
 
+_connect = socket.socket.connect
+
+
+def guarded_connect(self, address):
+    """Ultima barrera: ninguna conexion saliente del proceso (yt-dlp, redirecciones, segmentos HLS,
+    miniaturas) puede llegar a una direccion privada, aunque el DNS cambie despues de check_url()."""
+    if self.family in (socket.AF_INET, socket.AF_INET6) and blocked_ip(str(address[0])):
+        raise ConnectionRefusedError(f"Conexion bloqueada: {address[0]} es una direccion privada o local")
+    return _connect(self, address)
+
+
+def install_connect_guard() -> None:
+    socket.socket.connect = guarded_connect
+
+
 def config_dir() -> Path:
     if os.environ.get("OFFLINE_CONFIG_DIR"):
         return Path(os.environ["OFFLINE_CONFIG_DIR"])
@@ -159,6 +189,9 @@ def load_key() -> tuple[str, Path | None]:
         return env, None
     f = config_dir() / "key"
     if f.exists():
+        if os.name != "nt" and stat.S_IMODE(f.stat().st_mode) & 0o077:
+            os.chmod(f, 0o600)   # alguien la dejo legible para otros: se corrige
+            print(f"Aviso: {f} tenia permisos abiertos; ahora es 600.", file=sys.stderr)
         k = f.read_text(encoding="utf-8").strip()
         if len(k) >= 12:
             return k, f
@@ -174,6 +207,8 @@ def load_key() -> tuple[str, Path | None]:
 HAS_FFMPEG = shutil.which("ffmpeg") is not None
 JOBS: dict[str, dict] = {}
 LOCK = threading.Lock()
+ACTIVE = 0   # hilos de descarga vivos (no entradas de JOBS: una descarga descartada sigue contando hasta que corta)
+FAILS: dict[str, list[float]] = {}
 
 
 def wipe(job_id: str) -> None:
@@ -195,11 +230,18 @@ def janitor() -> None:
 
 
 def options(job_id: str, mode: str, quality: str, ies: list[str] | None = None) -> dict:
+    sizes: dict[str, int] = {}
+
     def hook(d):
         with LOCK:
             j = JOBS.get(job_id)
-            if not j:
-                return
+            if not j or time.time() - j["created"] > MAX_WORK:
+                # descartada por el janitor o pasada de tiempo: yt-dlp corta al recibir la excepcion
+                raise RuntimeError("Descarga cancelada: tardo demasiado")
+            sizes[str(d.get("filename"))] = d.get("downloaded_bytes") or 0
+            if sum(sizes.values()) > MAX_FILESIZE:
+                # tambien para HLS/DASH y para video+audio juntos (max_filesize solo mira un archivo)
+                raise RuntimeError("Demasiado pesado (mas de 1,2 GB). Prueba en audio o en 360p.")
             if d.get("status") == "downloading":
                 tot = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
                 if tot:
@@ -212,7 +254,8 @@ def options(job_id: str, mode: str, quality: str, ies: list[str] | None = None) 
     tmpl = "%(title).120B [%(id)s].%(ext)s" if not ies else "%(title).100B {%(extractor_key)s %(id).40B}.%(ext)s"
     o = {"outtmpl": str(TMP_ROOT / job_id / tmpl), "allowed_extractors": ies or ["youtube"],
          "playlist_items": "1", "noplaylist": True, "max_filesize": MAX_FILESIZE, "progress_hooks": [hook], "quiet": True,
-         "no_warnings": True, "noprogress": True, "cachedir": False}
+         "no_warnings": True, "noprogress": True, "cachedir": False,
+         "hls_prefer_native": True}   # HLS con el descargador de Python (pasa por el guardia de conexiones), no con ffmpeg
     h = {"360": 360, "480": 480, "720": 720}.get(quality, 480)
     if mode == "audio":
         if HAS_FFMPEG:
@@ -251,6 +294,7 @@ def single(info: dict) -> dict:
 
 
 def run(job_id: str, url: str, mode: str, quality: str, ies: list[str] | None = None) -> None:
+    global ACTIVE
     try:
         (TMP_ROOT / job_id).mkdir(parents=True)
         with yt_dlp.YoutubeDL(options(job_id, mode, quality, ies)) as ydl:
@@ -277,6 +321,9 @@ def run(job_id: str, url: str, mode: str, quality: str, ies: list[str] | None = 
         with LOCK:
             if job_id in JOBS:
                 JOBS[job_id].update(status="error", done=time.time(), error=friendly(exc))
+    finally:
+        with LOCK:
+            ACTIVE -= 1
 
 
 APPROX = {"youtubetab": {"approximate_date": [""]}}   # "hace 3 anios" -> fecha aproximada
@@ -287,7 +334,7 @@ def search(q: str, n: int = 12, sort: str = "") -> list[dict]:
     sort=new/old: trae 40 resultados y los ordena por fecha (YouTube ya no ordena por fecha)."""
     if sort in ("new", "old"):
         n = 40
-    o = {"quiet": True, "no_warnings": True, "extract_flat": True,
+    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "allowed_extractors": YT_IES,
          "skip_download": True, "cachedir": False, "extractor_args": APPROX}
     with yt_dlp.YoutubeDL(o) as ydl:
         check_url("https://www.youtube.com/")
@@ -349,7 +396,7 @@ def list_items(kind: str, lid: str) -> dict:
         url = f"https://www.youtube.com/playlist?list={lid}"
     else:
         url = f"https://www.youtube.com/{lid}/videos" if lid.startswith("@") else f"https://www.youtube.com/channel/{lid}/videos"
-    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True,
+    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True, "allowed_extractors": YT_IES,
          "cachedir": False, "playlistend": MAX_LIST, "extractor_args": APPROX}
     with yt_dlp.YoutubeDL(o) as ydl:
         info = ydl.extract_info(check_url(url), download=False)
@@ -361,7 +408,7 @@ def list_items(kind: str, lid: str) -> dict:
 
 def search_playlists(q: str) -> list[dict]:
     """Playlists que coinciden con la busqueda (filtro 'Playlists' de YouTube)."""
-    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True,
+    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True, "allowed_extractors": YT_IES,
          "cachedir": False, "playlistend": 24}
     with yt_dlp.YoutubeDL(o) as ydl:
         info = ydl.extract_info(check_url("https://www.youtube.com/results?search_query="
@@ -380,7 +427,7 @@ def search_playlists(q: str) -> list[dict]:
 
 def video_info(vid: str) -> dict:
     """Ficha para mostrar ANTES de descargar: fecha exacta, vistas y descripcion."""
-    o = {"quiet": True, "no_warnings": True, "skip_download": True, "cachedir": False}
+    o = {"quiet": True, "no_warnings": True, "skip_download": True, "cachedir": False, "allowed_extractors": YT_IES}
     with yt_dlp.YoutubeDL(o) as ydl:
         i = ydl.extract_info(check_url(f"https://www.youtube.com/watch?v={vid}"), download=False, process=False)
     cid = i.get("channel_id") or ""
@@ -390,12 +437,20 @@ def video_info(vid: str) -> dict:
             "duration": i.get("duration"), "description": (i.get("description") or "")[:1500]}
 
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None   # una redireccion podria llevar a otro host: no se sigue
+
+
+OPENER = build_opener(NoRedirect)
+
+
 def fetch_image(url: str) -> str | None:
     """Miniatura como data: URI (la descarga el servidor, nunca el celular). Max 400 KB."""
     if not url.startswith("https://"):
         return None
     try:
-        with urlopen(check_url(url), timeout=8) as r:
+        with OPENER.open(check_url(url), timeout=8) as r:
             ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip()
             if ctype not in ("image/jpeg", "image/png", "image/webp"):
                 return None
@@ -420,7 +475,7 @@ def link_info(raw: str) -> dict:
 
 
 def flat(url: str, n: int) -> list[dict]:
-    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True,
+    o = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True, "allowed_extractors": YT_IES,
          "cachedir": False, "playlistend": n, "extractor_args": APPROX}
     with yt_dlp.YoutubeDL(o) as ydl:
         info = ydl.extract_info(check_url(url), download=False)
@@ -442,7 +497,7 @@ def channel_videos(cid: str) -> list[dict]:
 
 
 def fetch_thumb(vid: str) -> bytes:
-    with urlopen(check_url(f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg"), timeout=10) as r:
+    with OPENER.open(check_url(f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg"), timeout=10) as r:
         return r.read(2_000_000)
 
 
@@ -450,9 +505,38 @@ def public(j: dict) -> dict:
     return {k: j.get(k) for k in ("id", "status", "progress", "filename", "size", "error", "mode")}
 
 
+def csp() -> str:
+    """CSP estricta: el unico script permitido es el de index.html, identificado por su hash."""
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    hashes = " ".join("'sha256-" + base64.b64encode(hashlib.sha256(m.encode()).digest()).decode() + "'"
+                      for m in re.findall(r"<script>(.*?)</script>", html, re.S))
+    return ("default-src 'none'; script-src " + hashes + "; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' https://i.ytimg.com data: blob:; media-src 'self' blob:; connect-src 'self'; "
+            "worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+
+
+CSP = csp()
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
 class H(BaseHTTPRequestHandler):
+    timeout = REQ_TIMEOUT   # una conexion que no manda su pedido a tiempo se corta
+    server_version = "offline-entertainment"
+    sys_version = ""
+
     def log_message(self, *a):  # sin registros
         pass
+
+    def end_headers(self):
+        for k, v in SECURITY_HEADERS.items():
+            self.send_header(k, v)
+        super().end_headers()
 
     def js(self, data, status=200):
         b = json.dumps(data, ensure_ascii=False).encode()
@@ -462,6 +546,30 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(b)
+
+    def ip(self) -> str:
+        return self.client_address[0]
+
+    def locked_out(self) -> bool:
+        now = time.time()
+        with LOCK:
+            h = [t for t in FAILS.get(self.ip(), []) if now - t < FAIL_LIMIT[1]]
+            FAILS[self.ip()] = h
+            return len(h) >= FAIL_LIMIT[0]
+
+    def check_key(self) -> bool:
+        """Clave correcta -> True. Si no, responde 401 (o 429 tras muchos intentos) y devuelve False."""
+        if self.locked_out():
+            self.js({"error": "Demasiados intentos con una clave incorrecta. Espera unos minutos."}, 429)
+            return False
+        if self.authed():
+            return True
+        with LOCK:
+            if len(FAILS) > 5000:
+                FAILS.clear()
+            FAILS.setdefault(self.ip(), []).append(time.time())
+        self.js({"error": "clave incorrecta"}, 401)
+        return False
 
     def authed(self) -> bool:
         return bool(KEY) and hmac.compare_digest(
@@ -474,6 +582,8 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(p.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(b)))
         self.send_header("Cache-Control", "no-cache")
+        if name == "index.html":
+            self.send_header("Content-Security-Policy", CSP)
         self.end_headers()
         self.wfile.write(b)
 
@@ -486,8 +596,8 @@ class H(BaseHTTPRequestHandler):
             return self.static(path[1:])
         if not path.startswith("/api/"):
             return self.js({"error": "no encontrado"}, 404)
-        if not self.authed():
-            return self.js({"error": "clave incorrecta"}, 401)
+        if not self.check_key():
+            return
         if path == "/api/ping":
             return self.js({"ok": True})
         qs = parse_qs(urlparse(self.path).query)
@@ -497,7 +607,11 @@ class H(BaseHTTPRequestHandler):
                 return self.js([])
             sort = (qs.get("sort") or [""])[0]
             try:
-                return self.js(search(q, min(int((qs.get("n") or ["12"])[0]), 24), sort))
+                n = max(1, min(int((qs.get("n") or ["12"])[0]), 24))
+            except ValueError:
+                n = 12
+            try:
+                return self.js(search(q, n, sort))
             except Exception as exc:  # noqa: BLE001
                 msg = re.sub(r"\x1b\[[0-9;]*m", "", str(exc)).split("; please report")[0]
                 return self.js({"error": msg.replace("ERROR: ", "")[:300]}, 502)
@@ -587,13 +701,15 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         if urlparse(self.path).path != "/api/jobs":
             return self.js({"error": "no encontrado"}, 404)
-        if not self.authed():
-            return self.js({"error": "clave incorrecta"}, 401)
-        n = int(self.headers.get("Content-Length") or 0)
+        if not self.check_key():
+            return
         try:
+            n = int(self.headers.get("Content-Length") or 0)
             d = json.loads(self.rfile.read(n)) if 0 < n < 5000 else {}
-        except json.JSONDecodeError:
-            d = {}
+        except (ValueError, UnicodeDecodeError, OSError):
+            d = None
+        if not isinstance(d, dict):
+            return self.js({"error": "pedido invalido"}, 400)
         raw = str(d.get("id") or d.get("url") or "")
         vid, ies = youtube_id(raw), None
         if vid:
@@ -604,17 +720,44 @@ class H(BaseHTTPRequestHandler):
         else:
             return self.js({"error": f"Ese enlace no es de un sitio compatible: {SITE_NAMES}."}, 400)
         mode = "audio" if d.get("mode") == "audio" else "video"
+        if shutil.disk_usage(TMP_ROOT).free < MIN_FREE:
+            return self.js({"error": "El servidor se esta quedando sin espacio en disco.", "retry": 60}, 429)
+        global ACTIVE
         with LOCK:
-            active = sum(1 for j in JOBS.values() if j["status"] not in ("listo", "error"))
-            if active >= MAX_ACTIVE:
+            if ACTIVE >= MAX_ACTIVE:
                 return self.js({"error": "Espera a que termine la descarga actual", "retry": 10}, 429)
-        with LOCK:
+            ACTIVE += 1
             job_id = uuid.uuid4().hex[:16]
             JOBS[job_id] = {"id": job_id, "status": "en cola", "progress": 0,
                             "mode": mode, "created": time.time()}
         threading.Thread(target=run, args=(job_id, url, mode, str(d.get("quality", "480")), ies),
                          daemon=True).start()
         self.js(public(JOBS[job_id]), 201)
+
+
+class Server(ThreadingHTTPServer):
+    """Como ThreadingHTTPServer, con tope de conexiones simultaneas y sin volcar errores (ni IPs) en la consola."""
+    daemon_threads = True
+    slots = threading.BoundedSemaphore(MAX_CONN)
+
+    def process_request(self, request, client_address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.slots.release()
+
+    def handle_error(self, request, client_address):
+        pass   # sin registros: un pedido roto no deja rastro (ni la IP) en la salida
 
 
 def lan_ip() -> str | None:
@@ -633,12 +776,12 @@ def main():
     ap.add_argument("--host", default=os.environ.get("OFFLINE_HOST", "127.0.0.1"),
                     help="127.0.0.1 = solo este equipo (por defecto); 0.0.0.0 = tu red de casa")
     a = ap.parse_args()
+    global TMP_ROOT
     KEY, key_file = load_key()
-    shutil.rmtree(TMP_ROOT, ignore_errors=True)
-    TMP_ROOT.mkdir(parents=True)
-    os.chmod(TMP_ROOT, 0o700)
+    TMP_ROOT = Path(tempfile.mkdtemp(prefix="offline-entertainment-"))   # nueva, 0700, solo de este proceso
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))                 # docker stop / systemctl stop
     threading.Thread(target=janitor, daemon=True).start()
-    srv = ThreadingHTTPServer((a.host, a.port), H)
+    srv = Server((a.host, a.port), H)
     host = "127.0.0.1" if a.host in ("0.0.0.0", "::", "127.0.0.1") else a.host
     print(f"Offline Entertainment listo  (ffmpeg: {'si' if HAS_FFMPEG else 'NO, instalalo para audio mp3'})")
     if sys.stdout.isatty():
@@ -650,7 +793,13 @@ def main():
         print(f"  Direccion: http://{host}:{a.port}")
         print(f"  Clave guardada en {key_file}" if key_file else "  Clave: la de OFFLINE_KEY")
     sys.stdout.flush()
-    srv.serve_forever()
+    install_connect_guard()   # desde aqui ninguna conexion saliente llega a una red privada
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        shutil.rmtree(TMP_ROOT, ignore_errors=True)   # al salir no queda nada en disco
 
 
 if __name__ == "__main__":

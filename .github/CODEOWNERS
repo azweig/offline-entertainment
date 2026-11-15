@@ -1,0 +1,6 @@
+# Every change is reviewed by the maintainer; security-sensitive paths are listed explicitly.
+*                       @azweig
+server.py               @azweig
+static/sw.js            @azweig
+.github/workflows/      @azweig
+Dockerfile              @azweig

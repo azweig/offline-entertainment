@@ -1,0 +1,45 @@
+name: Bug report / Reportar un error
+description: Something doesn't work as documented. / Algo no funciona como dice la documentación.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problem?** Don't open an issue: use *Security → Report a vulnerability*.
+        **Site stopped working?** Run `make update` (updates yt-dlp) and try again first.
+        **Never paste your key** in an issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / ¿Qué pasó?
+      description: What you did, what you expected and what you got.
+    validations:
+      required: true
+  - type: input
+    id: site
+    attributes:
+      label: Site and type of content / Sitio y tipo de contenido
+      placeholder: "e.g. YouTube playlist, public TikTok video"
+  - type: dropdown
+    id: how
+    attributes:
+      label: How do you run it? / ¿Cómo lo corres?
+      options: [start.sh / start.bat, make run, Docker, Other]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions / Versiones
+      description: "Output of: python --version; .venv/bin/yt-dlp --version; ffmpeg -version | head -1"
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and browser / Celular y navegador
+      placeholder: "e.g. iPhone 15, iOS 18, installed to home screen"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error message / Mensaje de error
+      description: Remove any key, IP or personal data before pasting.
+      render: text

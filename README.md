@@ -9,6 +9,8 @@
 
 <p align="center">
   <a href="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml"><img src="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/azweig/offline-entertainment/actions/workflows/codeql.yml"><img src="https://github.com/azweig/offline-entertainment/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="docs/security.md"><img src="https://img.shields.io/badge/security-reviewed-1F6B3A" alt="Security reviewed"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-f2a33a" alt="MIT"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-1b2636" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/self--hosted-yes-1b2636" alt="Self-hosted">
@@ -32,6 +34,7 @@ No accounts. No central service. No middlemen. The server keeps nothing.
 
 ## Contents
 
+- [Documentation](#documentation)
 - [Features](#features)
 - [Supported sites](#supported-sites)
 - [Quick start](#quick-start)
@@ -44,6 +47,19 @@ No accounts. No central service. No middlemen. The server keeps nothing.
 - [Limitations](#limitations)
 - [Usage notice](#usage-notice)
 - [Contributing](#contributing) · [Credits](#credits) · [License](#license)
+
+## Documentation
+
+| Guide | What's inside |
+|---|---|
+| [Self-hosting](docs/self-hosting.md) | Docker, systemd, Tailscale, reverse proxy (Caddy/nginx), keys, hardening checklist |
+| [Architecture](docs/architecture.md) | C4 context/container/component diagrams, UML class, sequence and state diagrams, data map, limits |
+| [HTTP API](docs/api.md) · [OpenAPI](docs/openapi.yaml) | Every endpoint, parameters, errors, curl example |
+| [Security](docs/security.md) | Threat model (STRIDE), controls mapped to code and tests, security review, residual risks |
+| [Development](docs/development.md) | Setup, `make` commands, conventions, adding a site, releasing |
+| [Troubleshooting](docs/troubleshooting.md) | Common errors and FAQ |
+| [Decisions (ADRs)](docs/adr/) | Why it is built this way |
+| [Changelog](CHANGELOG.md) · [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) | |
 
 ## Features
 
@@ -96,7 +112,7 @@ Deno to read YouTube.
 
 1. `git clone https://github.com/azweig/offline-entertainment && cd offline-entertainment`
 2. Start it:
-   - macOS / Linux: `./start.sh`
+   - macOS / Linux: `make run` (or `./start.sh`)
    - Windows: double-click `start.bat`
 3. Open the address printed in the terminal: `http://127.0.0.1:8765/#k=…`. That link already
    carries your key.
@@ -110,8 +126,10 @@ To use your own, set `OFFLINE_KEY` (12+ characters). There is always a key.
 ffmpeg and Deno are included in the image.
 
 1. `git clone https://github.com/azweig/offline-entertainment && cd offline-entertainment`
-2. `docker compose up -d --build`
-3. Open `http://127.0.0.1:8765` and type the key from `cat config/key`.
+2. `make docker-up` (or `docker compose up -d --build`)
+3. Open `http://127.0.0.1:8765` and type the key that `make key` prints.
+
+Run `make` alone to see every shortcut: `make key`, `make update`, `make test`, `make check`…
 
 The container writes no logs (`logging: none`).
 
@@ -161,7 +179,8 @@ sequenceDiagram
 1. The phone asks your server for a file, sending your key.
 2. The server prepares it with yt-dlp and ffmpeg in a temporary folder.
 3. It is sent **once** and **deleted right away**, whether it arrived complete or not. Anything nobody
-   picks up within 20 minutes is deleted, and the temp folder is wiped on every start.
+   picks up within 20 minutes is deleted, and each run uses a new private temp folder that is
+   removed when the server stops.
 4. The phone keeps the file in its own storage. The service worker keeps the app itself, so it
    opens without a connection.
 
@@ -214,8 +233,14 @@ static/manifest.webmanifest, icon.svg, *.png   installable app metadata and icon
 tests/test_server.py   auth, key file, site allowlist, private-address blocking
 start.sh / start.bat   one-command start for macOS/Linux and Windows
 Dockerfile, docker-compose.yml
-.github/workflows/ci.yml   tests + a real start (401 without key, 200 with key)
+scripts/smoke.sh       real start-up check (key 600, 401 / 200, 404)
+Makefile               run, test, lint, smoke, check, docker-up, key, update
+docs/                  architecture, API + OpenAPI, security, self-hosting, ADRs
+.github/               CI, CodeQL, Dependabot, issue forms, PR template
 ```
+
+More diagrams (components, UML classes, every flow, job state machine, deployments) are in
+[docs/architecture.md](docs/architecture.md).
 
 **HTTP API.** Every `/api/*` call needs the `X-Key` header.
 
@@ -244,10 +269,13 @@ Dockerfile, docker-compose.yml
   rebuilt on the server. For other sites there is a closed domain allowlist: the link is rebuilt
   (always https, no username or password, no port, no fragment) and yt-dlp loads **only that site's
   extractors, never the generic one** that would open any page.
-- **Private networks are blocked.** Before every connection, including the media servers a file comes
-  from and thumbnails, the hostname is resolved and the request is refused if it points to
-  127.0.0.0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, 0.0.0.0/8, ::1, fc00::/7 or
-  fe80::/10.
+- **Private networks are blocked, twice.** Before yt-dlp starts, the hostname is resolved and refused
+  if it points to 127.0.0.0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, 0.0.0.0/8, ::1,
+  fc00::/7, fe80::/10 and other private ranges. Then every socket the server opens is checked again
+  at connect time, so redirects, media segments and DNS changes can't reach your home network either.
+- **Hardened HTTP.** Strict Content-Security-Policy (only the app's own script, by hash), no framing,
+  `nosniff`, 15-second request timeout, a cap on simultaneous connections, and a pause after
+  repeated wrong keys.
 - **Nothing is kept.** No database, history, titles or access logs. Files are deleted on delivery, and
   searches are cached in memory only, for 6 hours.
 - **Bounded work.** At most 2 downloads at a time, 1.2 GB per file, 3 hours per job, and 200 items per
@@ -255,7 +283,9 @@ Dockerfile, docker-compose.yml
 - **No block evasion.** There is no support for account cookies, proxies or browser impersonation, and
   none will be accepted.
 
-Found a vulnerability? Please use **Security → Report a vulnerability** on GitHub instead of a public issue.
+The full threat model, the controls with links to the code and tests, and the latest review are in
+[docs/security.md](docs/security.md). Found a vulnerability? Please follow [SECURITY.md](SECURITY.md)
+(**Security → Report a vulnerability** on GitHub), not a public issue.
 
 ## Configuration
 
@@ -292,10 +322,12 @@ terms of service. Save only what you have the right to save.
 
 ## Contributing
 
-Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Run the tests with:
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[development guide](docs/development.md). Before opening one, run what CI runs:
 
 ```bash
-python -m unittest discover -s tests -v
+make setup   # once
+make check   # lint + unit tests + real start-up check
 ```
 
 ## Credits

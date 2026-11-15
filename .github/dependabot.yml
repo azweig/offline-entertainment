@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # yt-dlp changes often to keep up with the sites: a weekly bump keeps the app working
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

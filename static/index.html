@@ -125,6 +125,8 @@
 
 <script>
 const $ = s => document.querySelector(s);
+// miniatura que no carga: se quita (sin onerror en el HTML, la CSP no permite manejadores en linea)
+document.addEventListener('error', e => { if (e.target.tagName === 'IMG' && e.target.closest('.th')) e.target.remove(); }, true);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const mb = b => b > 1e9 ? (b/1e9).toFixed(1)+' GB' : Math.max(1, Math.round(b/1e6))+' MB';
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -260,7 +262,7 @@ function nav(){
 $('#nav').onclick = e => { const b = e.target.closest('button'); if (b){ $('#q').value = ''; go(b.dataset.v); } };
 const saved = id => library.some(f => f.name.includes(`[${id}]`));
 const card = (v, mode) => `<button class="cardv" data-id="${esc(v.id)}" data-mode="${mode}">
-  <div class="th"><img loading="lazy" src="${esc(v.thumb)}" alt="" onerror="this.remove()">${saved(v.id) ? '<span class="badge">Guardado</span>' : ''}${v.duration ? `<span class="dur">${dur(v.duration)}</span>` : ''}</div>
+  <div class="th"><img loading="lazy" src="${esc(v.thumb)}" alt="">${saved(v.id) ? '<span class="badge">Guardado</span>' : ''}${v.duration ? `<span class="dur">${dur(v.duration)}</span>` : ''}</div>
   <div class="ti">${esc(v.title)}</div><div class="ch">${esc(v.channel)}${v.ts ? ' · ' + ago(v.ts) : ''}</div></button>`;
 const known = new Map();
 const remember = list => (list.forEach(v => known.set(v.id, v)), list);
@@ -294,7 +296,7 @@ async function go(v, query){
       const k = 'pl|' + q, pls = cache.get(k) || await getJSON('api/playlists?q=' + encodeURIComponent(q)); cache.set(k, pls);
       if (tok !== searchTok || !$('#res')) return;
       $('#res').innerHTML = pls.length ? `<div class="grid">${pls.map(p => `<button class="cardv" data-list="${esc(p.id)}">
-        <div class="th">${p.thumb ? `<img loading="lazy" src="${esc(p.thumb)}" alt="" onerror="this.remove()">` : ''}<span class="badge">Playlist</span></div>
+        <div class="th">${p.thumb ? `<img loading="lazy" src="${esc(p.thumb)}" alt="">` : ''}<span class="badge">Playlist</span></div>
         <div class="ti">${esc(p.title)}</div><div class="ch">${esc(p.channel)}</div></button>`).join('')}</div>` : '<div class="msg">No se encontraron playlists.</div>';
     } catch (e) { if (tok === searchTok && $('#res')) $('#res').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
     return;

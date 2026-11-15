@@ -27,6 +27,9 @@ class Auth(unittest.TestCase):
     def tearDownClass(cls):
         cls.srv.shutdown()
 
+    def setUp(self):
+        server.FAILS.clear()
+
     def call(self, path, key=None, body=None):
         h = {"X-Key": key} if key is not None else {}
         data = None
@@ -163,6 +166,86 @@ class PrivateAddresses(unittest.TestCase):
         self.assertEqual(server.JOBS[jid]["status"], "error")
         self.assertIn("privada", server.JOBS[jid]["error"])
         server.JOBS.pop(jid, None)
+
+
+class Hardening(Auth):   # reusa el servidor de prueba de Auth
+    """Arreglos de la revision de seguridad (docs/security.md)."""
+
+    def raw(self, data: bytes) -> bytes:
+        host, port = self.srv.server_address
+        with socket.create_connection((host, port), timeout=5) as c:
+            c.sendall(data)
+            c.shutdown(socket.SHUT_WR)
+            return c.recv(4096)
+
+    def test_barra_invertida_no_engana_al_filtro(self):
+        for raw in ("https://localhost\\x.bandcamp.com/track/a", "https://127.0.0.1\\.bandcamp.com/track/a",
+                    "https://evil%2ecom.bandcamp.com/track/a", "https://a b.bandcamp.com/track/a",
+                    "https://xn--.bandcamp.com/track/a", "https://-a.bandcamp.com/track/a"):
+            self.assertIsNone(server.site_link(raw), raw)
+        self.assertIsNotNone(server.site_link("https://artista-1.bandcamp.com/track/a"))
+
+    def test_guardia_de_conexion(self):
+        for ip in ("127.0.0.1", "10.0.0.1", "169.254.169.254", "::1", "64:ff9b::a00:1", "2002:a00:1::1", "fec0::1"):
+            fam = socket.AF_INET6 if ":" in ip else socket.AF_INET
+            with socket.socket(fam, socket.SOCK_STREAM) as so, self.assertRaises(ConnectionRefusedError):
+                server.guarded_connect(so, (ip, 80))
+
+    def test_cuerpo_roto_400_sin_cortar(self):
+        for body in (b"[1,2]", b"\xff\xfe", b"no es json"):
+            r = self.raw(b"POST /api/jobs HTTP/1.1\r\nHost: x\r\nX-Key: " + KEY.encode() +
+                         b"\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+            self.assertIn(b" 400 ", r.split(b"\r\n")[0], body)
+        r = self.raw(b"POST /api/jobs HTTP/1.1\r\nHost: x\r\nX-Key: " + KEY.encode() + b"\r\nContent-Length: abc\r\n\r\n")
+        self.assertIn(b" 400 ", r.split(b"\r\n")[0])
+
+    def test_muchas_claves_malas_429(self):
+        for _ in range(server.FAIL_LIMIT[0]):
+            self.assertEqual(self.call("/api/ping", "mala-mala-mala")[0], 401)
+        self.assertEqual(self.call("/api/ping", "mala-mala-mala")[0], 429)
+        self.assertEqual(self.call("/api/ping", KEY)[0], 429)   # bloquea a esa IP un rato, aun con la clave
+        server.FAILS.clear()
+        self.assertEqual(self.call("/api/ping", KEY)[0], 200)
+
+    def test_cabeceras_de_seguridad_y_csp(self):
+        with urlopen(self.base + "/", timeout=5) as r:
+            h = r.headers
+            body = r.read().decode()
+        self.assertEqual(h["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(h["X-Frame-Options"], "DENY")
+        self.assertIn("frame-ancestors 'none'", h["Content-Security-Policy"])
+        script_src = h["Content-Security-Policy"].split("script-src")[1].split(";")[0]
+        self.assertIn("'sha256-", script_src)
+        self.assertNotIn("unsafe", script_src)
+        self.assertNotIn("onerror=", body)   # la CSP no permite manejadores en linea
+        self.assertEqual(self.call("/api/ping", KEY)[0], 200)
+
+    def test_n_fuera_de_rango_no_llega_a_ytdlp(self):
+        with mock.patch.object(server, "search", return_value=[]) as s:
+            for n in ("0", "-5", "999", "abc"):
+                self.assertEqual(self.call(f"/api/search?q=x&n={n}", KEY)[0], 200)
+            self.assertEqual([c.args[1] for c in s.call_args_list], [1, 1, 24, 12])
+
+    def test_limite_de_descargas_cuenta_hilos(self):
+        with mock.patch.object(server, "ACTIVE", server.MAX_ACTIVE):
+            r = self.call("/api/jobs", KEY, {"id": "dQw4w9WgXcQ"})
+        self.assertEqual(r[0], 429)
+
+    def test_corta_si_pasa_el_tope_de_tamano(self):
+        jid = "fedcba9876543210"
+        server.JOBS[jid] = {"id": jid, "status": "en cola", "created": __import__("time").time()}
+        hook = server.options(jid, "video", "480")["progress_hooks"][0]
+        hook({"status": "downloading", "filename": "v.mp4", "downloaded_bytes": server.MAX_FILESIZE // 2 + 1})
+        with self.assertRaises(RuntimeError):
+            hook({"status": "downloading", "filename": "a.m4a", "downloaded_bytes": server.MAX_FILESIZE // 2 + 1})
+        server.JOBS.pop(jid)
+        with self.assertRaises(RuntimeError):   # descartada por el janitor: la descarga se corta
+            hook({"status": "downloading", "filename": "v.mp4", "downloaded_bytes": 1})
+
+    def test_todas_las_busquedas_solo_con_youtube(self):
+        import inspect
+        for fn in (server.search, server.list_items, server.search_playlists, server.video_info, server.flat):
+            self.assertIn("allowed_extractors", inspect.getsource(fn), fn.__name__)
 
 
 if __name__ == "__main__":

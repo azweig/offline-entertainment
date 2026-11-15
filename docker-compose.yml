@@ -4,12 +4,23 @@ services:
     restart: unless-stopped
     ports:
       # Solo este equipo. Para usarlo desde el celular en tu red de casa cambia a "8765:8765"
-      # (lee "Desde el celular" en el README).
+      # (mejor: Tailscale; lee docs/self-hosting.md).
       - "127.0.0.1:8765:8765"
     volumes:
-      - ./config:/config        # aqui queda tu clave (archivo config/key)
-    # Opcional: tu propia clave en vez de la generada
+      # Volumen con nombre: Docker lo crea con el dueno correcto (usuario app, uid 10001).
+      # Tu clave queda en /config/key; verla: make key
+      - config:/config
+    # Opcional: tu propia clave en vez de la generada (ponla en un archivo .env, no aqui)
     # environment:
-    #   OFFLINE_KEY: "una-clave-larga-y-privada"
+    #   OFFLINE_KEY: ${OFFLINE_KEY}
+    # Endurecimiento: sin privilegios extra y con topes de recursos
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 1g
     logging:
       driver: "none"            # sin registros
+
+volumes:
+  config:

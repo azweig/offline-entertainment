@@ -1,0 +1,28 @@
+name: Feature request / Pedir una función
+description: Suggest an improvement. / Sugiere una mejora.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Out of scope (see CONTRIBUTING.md): account cookies or logins, proxies, browser impersonation,
+        getting around site blocks, public or multi-user modes.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve? / ¿Qué problema resuelve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution / Solución propuesta
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope / Alcance
+      options:
+        - label: It keeps the server free of history, titles and logs.
+          required: true
+        - label: It does not need account cookies, proxies or block evasion.
+          required: true

@@ -1,0 +1,4 @@
+# Development tools only (the server needs just requirements.txt)
+-r requirements.txt
+ruff>=0.8
+pip-audit>=2.7

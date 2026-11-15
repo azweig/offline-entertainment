@@ -9,6 +9,8 @@
 
 <p align="center">
   <a href="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml"><img src="https://github.com/azweig/offline-entertainment/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/azweig/offline-entertainment/actions/workflows/codeql.yml"><img src="https://github.com/azweig/offline-entertainment/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+  <a href="docs/security.md"><img src="https://img.shields.io/badge/seguridad-revisada-1F6B3A" alt="Seguridad revisada"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-f2a33a" alt="MIT"></a>
   <img src="https://img.shields.io/badge/python-3.11%2B-1b2636" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/en_tu_servidor-s%C3%AD-1b2636" alt="En tu propio servidor">
@@ -33,6 +35,7 @@ Sin cuentas. Sin servicios centrales. Sin intermediarios. El servidor no guarda 
 
 ## Contenido
 
+- [Documentación](#documentación)
 - [Funciones](#funciones)
 - [Sitios compatibles](#sitios-compatibles)
 - [Instalación rápida](#instalación-rápida)
@@ -45,6 +48,21 @@ Sin cuentas. Sin servicios centrales. Sin intermediarios. El servidor no guarda 
 - [Limitaciones](#limitaciones)
 - [Aviso de uso](#aviso-de-uso)
 - [Contribuir](#contribuir) · [Créditos](#créditos) · [Licencia](#licencia)
+
+## Documentación
+
+La documentación técnica está en inglés, como es habitual en proyectos open source.
+
+| Guía | Qué tiene |
+|---|---|
+| [Instalación propia](docs/self-hosting.md) | Docker, systemd, Tailscale, proxy inverso (Caddy/nginx), claves, lista de seguridad |
+| [Arquitectura](docs/architecture.md) | Diagramas C4 (contexto, contenedores, componentes), UML de clases, secuencias y estados, dónde se guarda cada dato, límites |
+| [API HTTP](docs/api.md) · [OpenAPI](docs/openapi.yaml) | Cada endpoint, parámetros, errores y un ejemplo con curl |
+| [Seguridad](docs/security.md) | Modelo de amenazas (STRIDE), controles enlazados al código y a las pruebas, revisión de seguridad, riesgos que quedan |
+| [Desarrollo](docs/development.md) | Preparar el entorno, comandos `make`, convenciones, sumar un sitio, publicar versiones |
+| [Problemas frecuentes](docs/troubleshooting.md) | Errores comunes y preguntas frecuentes |
+| [Decisiones (ADR)](docs/adr/) | Por qué está hecho así |
+| [Cambios](CHANGELOG.md) · [Política de seguridad](SECURITY.md) · [Contribuir](CONTRIBUTING.md) | |
 
 ## Funciones
 
@@ -97,7 +115,7 @@ yt-dlp usa Deno para leer YouTube.
 
 1. `git clone https://github.com/azweig/offline-entertainment && cd offline-entertainment`
 2. Arranca:
-   - Mac / Linux: `./start.sh`
+   - Mac / Linux: `make run` (o `./start.sh`)
    - Windows: doble clic en `start.bat`
 3. Abre la dirección que aparece en la terminal: `http://127.0.0.1:8765/#k=…`. Ese enlace ya
    trae tu clave.
@@ -111,8 +129,10 @@ Si prefieres la tuya, define `OFFLINE_KEY` (12 caracteres o más). Siempre hay c
 La imagen ya trae ffmpeg y Deno.
 
 1. `git clone https://github.com/azweig/offline-entertainment && cd offline-entertainment`
-2. `docker compose up -d --build`
-3. Abre `http://127.0.0.1:8765` y escribe la clave que verás con `cat config/key`.
+2. `make docker-up` (o `docker compose up -d --build`)
+3. Abre `http://127.0.0.1:8765` y escribe la clave que muestra `make key`.
+
+Escribe solo `make` para ver todos los atajos: `make key`, `make update`, `make test`, `make check`…
 
 El contenedor no guarda registros (`logging: none`).
 
@@ -162,7 +182,8 @@ sequenceDiagram
 1. El celular le pide un archivo a tu servidor, con tu clave.
 2. El servidor lo prepara con yt-dlp y ffmpeg en una carpeta temporal.
 3. Lo envía **una vez** y lo **borra al instante**, haya llegado completo o no. Lo que nadie retira en
-   20 minutos se borra solo, y la carpeta temporal se limpia en cada arranque.
+   20 minutos se borra solo, y cada arranque usa una carpeta temporal nueva y privada que se borra
+   al apagar el servidor.
 4. El celular guarda el archivo en su propio almacenamiento. El service worker guarda la app, así que
    abre sin conexión.
 
@@ -215,8 +236,14 @@ static/manifest.webmanifest, icon.svg, *.png   datos e íconos de la app instala
 tests/test_server.py   clave, archivo de clave, lista de sitios, bloqueo de direcciones privadas
 start.sh / start.bat   arranque con un comando para Mac/Linux y Windows
 Dockerfile, docker-compose.yml
-.github/workflows/ci.yml   pruebas + arranque real (401 sin clave, 200 con clave)
+scripts/smoke.sh       prueba de arranque real (clave 600, 401 / 200, 404)
+Makefile               run, test, lint, smoke, check, docker-up, key, update
+docs/                  arquitectura, API + OpenAPI, seguridad, instalación, ADR
+.github/               CI, CodeQL, Dependabot, formularios de issues, plantilla de PR
 ```
+
+Más diagramas (componentes, clases UML, cada flujo, estados de una descarga, formas de instalarlo) en
+[docs/architecture.md](docs/architecture.md).
 
 **API HTTP.** Toda llamada a `/api/*` necesita la cabecera `X-Key`.
 
@@ -245,9 +272,14 @@ Dockerfile, docker-compose.yml
   caracteres y la URL se arma en el servidor. Para los demás sitios hay una lista cerrada de dominios:
   el enlace se rearma (siempre https, sin usuario ni clave, sin puerto, sin fragmento) y yt-dlp carga
   **solo los extractores de ese sitio, nunca el genérico** que abriría cualquier página.
-- **Las redes privadas están bloqueadas.** Antes de cada conexión, incluidas las de los servidores de
-  donde sale el archivo y las miniaturas, se resuelve el nombre y se rechaza si apunta a 127.0.0.0/8,
-  10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, 0.0.0.0/8, ::1, fc00::/7 o fe80::/10.
+- **Las redes privadas están bloqueadas, dos veces.** Antes de que arranque yt-dlp se resuelve el
+  nombre y se rechaza si apunta a 127.0.0.0/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10,
+  0.0.0.0/8, ::1, fc00::/7, fe80::/10 u otros rangos privados. Además, cada conexión que abre el
+  servidor se revisa otra vez al conectarse: ni una redirección, ni un segmento de video, ni un cambio
+  de DNS pueden llegar a tu red de casa.
+- **HTTP endurecido.** Política de seguridad de contenido (CSP) estricta: solo corre el script de la
+  app, identificado por su hash. Además: no se puede incrustar en otra página, `nosniff`, 15 segundos
+  para mandar cada pedido, un tope de conexiones simultáneas y una pausa tras varias claves incorrectas.
 - **No se guarda nada.** Sin base de datos, historial, títulos ni registros de acceso. Los archivos se
   borran al entregarse y las búsquedas se guardan solo en memoria, por 6 horas.
 - **Trabajo acotado.** Máximo 2 descargas a la vez, 1,2 GB por archivo, 3 horas por trabajo y 200
@@ -255,7 +287,9 @@ Dockerfile, docker-compose.yml
 - **Nada para saltarse bloqueos.** No hay soporte para cookies de cuentas, proxies ni para hacerse pasar
   por un navegador, y no se aceptarán.
 
-¿Encontraste una vulnerabilidad? Usa **Security → Report a vulnerability** en GitHub en vez de un issue público.
+El modelo de amenazas completo, los controles con enlaces al código y a las pruebas, y la última revisión
+están en [docs/security.md](docs/security.md). ¿Encontraste una vulnerabilidad? Sigue
+[SECURITY.md](SECURITY.md) (**Security → Report a vulnerability** en GitHub), no abras un issue público.
 
 ## Configuración
 
@@ -293,10 +327,12 @@ los términos de servicio de cada sitio. Guarda solo lo que tengas derecho a gua
 
 ## Contribuir
 
-Los aportes son bienvenidos. Lee [CONTRIBUTING.md](CONTRIBUTING.md). Corre las pruebas con:
+Los aportes son bienvenidos. Lee [CONTRIBUTING.md](CONTRIBUTING.md) y la
+[guía de desarrollo](docs/development.md). Antes de abrir un PR, corre lo mismo que el CI:
 
 ```bash
-python -m unittest discover -s tests -v
+make setup   # una vez
+make check   # lint + pruebas + arranque real
 ```
 
 ## Créditos

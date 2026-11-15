@@ -26,10 +26,16 @@ Gracias por ayudar. / *Thanks for helping.*
 **Pruebas / Tests**
 
 ```bash
-python -m unittest discover -s tests -v
+make setup   # una vez / once
+make check   # lint (ruff) + pruebas + arranque real / lint + unit tests + real start-up
 ```
+
+Más detalles en / *More in* [docs/development.md](docs/development.md). Antes de proponer algo grande,
+lee las decisiones en / *before a big change, read the decisions in* [docs/adr/](docs/adr/).
+
+**Conducta / Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
 Evita dependencias nuevas si se puede. / *Avoid new dependencies when possible.*
 
-**Vulnerabilidades / Vulnerabilities:** no abras un issue público; usa *Security → Report a
-vulnerability* en GitHub. / *Don't open a public issue; use Security → Report a vulnerability.*
+**Vulnerabilidades / Vulnerabilities:** no abras un issue público; sigue [SECURITY.md](SECURITY.md).
+/ *Don't open a public issue; follow [SECURITY.md](SECURITY.md).*

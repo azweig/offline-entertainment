@@ -1,0 +1,295 @@
+openapi: 3.1.0
+info:
+  title: Offline Entertainment API
+  version: 1.0.0
+  summary: Self-hosted server that prepares videos and music for offline playback on your phone.
+  description: |
+    Every `/api/*` endpoint requires the `X-Key` header. Error bodies are `{"error": "..."}`
+    with messages in Spanish (they are shown to the user as-is). See docs/api.md.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://127.0.0.1:8765
+    description: Default local server
+security:
+  - key: []
+tags:
+  - name: status
+  - name: youtube
+    description: YouTube metadata (read-only)
+  - name: links
+    description: Links from other supported sites
+  - name: jobs
+    description: Preparing and delivering files
+
+paths:
+  /api/ping:
+    get:
+      tags: [status]
+      summary: Check the key and that the server is reachable
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { ok: { type: boolean, const: true } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/search:
+    get:
+      tags: [youtube]
+      summary: Search YouTube videos
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 120 } }
+        - { name: n, in: query, schema: { type: integer, minimum: 1, maximum: 24, default: 12 } }
+        - { name: sort, in: query, schema: { type: string, enum: ["", new, old] }, description: "new/old fetch 40 results sorted by date" }
+      responses:
+        "200": { description: Results, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Video" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/playlists:
+    get:
+      tags: [youtube]
+      summary: Search YouTube playlists
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 120 } }
+      responses:
+        "200":
+          description: Playlists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type: { type: string, const: playlist }
+                    id: { type: string }
+                    title: { type: string }
+                    channel: { type: string }
+                    thumb: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/info:
+    get:
+      tags: [youtube]
+      summary: Details of one video, shown before saving
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Video details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  channel: { type: string }
+                  channel_id: { type: [string, "null"] }
+                  upload_date: { type: [string, "null"], description: YYYYMMDD }
+                  views: { type: [integer, "null"] }
+                  duration: { type: [number, "null"] }
+                  description: { type: string, maxLength: 1500 }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/related:
+    get:
+      tags: [youtube]
+      summary: YouTube Mix for a video (used by "For you")
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Related videos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seed:
+                    type: [object, "null"]
+                    properties: { channel: { type: string }, channel_id: { type: [string, "null"] } }
+                  items: { type: array, items: { $ref: "#/components/schemas/Video" } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/channel:
+    get:
+      tags: [youtube]
+      summary: Latest 12 videos of a channel
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string, pattern: "^UC[\\w-]{22}$" } }
+      responses:
+        "200": { description: Videos, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Video" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/playlist:
+    get:
+      tags: [youtube]
+      summary: Every item of a playlist (max 200)
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string, pattern: "^[\\w-]{12,80}$" } }
+      responses:
+        "200": { description: Playlist, content: { application/json: { schema: { $ref: "#/components/schemas/List" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/artist:
+    get:
+      tags: [youtube]
+      summary: Every video of a channel or @handle (max 200)
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string, pattern: "^(UC[\\w-]{22}|@[\\w.\\-]{3,40})$" } }
+      responses:
+        "200": { description: Channel, content: { application/json: { schema: { $ref: "#/components/schemas/List" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/link:
+    get:
+      tags: [links]
+      summary: Details of a link from another supported site
+      parameters:
+        - { name: url, in: query, required: true, schema: { type: string, format: uri, maxLength: 500 } }
+      responses:
+        "200":
+          description: Link details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  site: { type: string, examples: [TikTok] }
+                  url: { type: string, description: URL rebuilt by the server }
+                  title: { type: string, maxLength: 200 }
+                  channel: { type: string }
+                  upload_date: { type: [string, "null"] }
+                  views: { type: [integer, "null"] }
+                  duration: { type: [number, "null"] }
+                  description: { type: string, maxLength: 1500 }
+                  thumb: { type: [string, "null"], description: "data: URI, max 400 KB" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/thumb:
+    get:
+      tags: [youtube]
+      summary: A YouTube thumbnail, fetched through the server
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200": { description: JPEG (max 2 MB), content: { image/jpeg: { schema: { type: string, format: binary } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "502": { $ref: "#/components/responses/Upstream" }
+
+  /api/jobs:
+    post:
+      tags: [jobs]
+      summary: Start preparing a file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Body must be smaller than 5000 bytes. Provide `id` or `url`.
+              properties:
+                id: { type: string, description: YouTube ID or link }
+                url: { type: string, description: Link from a supported site }
+                mode: { type: string, enum: [audio, video], default: video }
+                quality: { type: string, enum: ["360", "480", "720"], default: "480" }
+      responses:
+        "201": { description: Job created, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429":
+          description: Two jobs are already running
+          content:
+            application/json:
+              schema: { type: object, properties: { error: { type: string }, retry: { type: integer, description: seconds } } }
+
+  /api/jobs/{id}:
+    get:
+      tags: [jobs]
+      summary: Job progress
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { description: Job, content: { application/json: { schema: { $ref: "#/components/schemas/Job" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/jobs/{id}/file:
+    get:
+      tags: [jobs]
+      summary: Download the prepared file (single use; deleted right after)
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200": { description: The file, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Not ready, or already being delivered", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+
+components:
+  securitySchemes:
+    key:
+      type: apiKey
+      in: header
+      name: X-Key
+      description: Generated on first start (file mode 600) or set with OFFLINE_KEY (12+ chars).
+  parameters:
+    VideoId:
+      { name: id, in: query, required: true, schema: { type: string, pattern: "^[\\w-]{11}$" } }
+    JobId:
+      { name: id, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{16}$" } }
+  responses:
+    BadRequest: { description: Invalid input or unsupported site, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Unauthorized: { description: Missing or wrong key, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    NotFound: { description: "Unknown, delivered or expired", content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    Upstream: { description: The site failed or refused, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties: { error: { type: string } }
+    Video:
+      type: object
+      properties:
+        id: { type: string, pattern: "^[\\w-]{11}$" }
+        title: { type: string }
+        duration: { type: [number, "null"] }
+        channel: { type: string }
+        url: { type: string }
+        thumb: { type: string }
+        ts: { type: [integer, "null"] }
+    List:
+      type: object
+      properties:
+        kind: { type: string, enum: [playlist, channel] }
+        id: { type: string }
+        title: { type: string }
+        owner: { type: string }
+        items: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/Video" } }
+    Job:
+      type: object
+      properties:
+        id: { type: string, pattern: "^[0-9a-f]{16}$" }
+        status: { type: string, enum: [en cola, descargando, procesando, listo, error] }
+        progress: { type: number, minimum: 0, maximum: 100 }
+        filename: { type: [string, "null"] }
+        size: { type: [integer, "null"] }
+        error: { type: [string, "null"] }
+        mode: { type: string, enum: [audio, video] }
